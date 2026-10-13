@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Markdown Viewer</title>
+  <link rel="icon" href="hutao.ico" type="image/x-icon">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+
+
+  
+  
+  
+
+  <!-- 应用自身布局样式 -->
+  <link rel="stylesheet" href="css/style.css?v=6.8">
+
+  
+  
+  
+  
+</head>
+<body>
+  <div id="app">
+    <header class="toolbar">
+      <div class="toolbar-left">
+        <strong class="brand"><img src="hutao.ico" class="app-icon" alt=""> Markdown Viewer</strong>
+        <button id="btn-open-file" class="btn" title="打开单个 Markdown 文件">打开文件</button>
+        <button id="btn-open-folder" class="btn" title="打开文件夹，浏览其中的 Markdown 文档">打开文件夹</button>
+          <button id="btn-restore-default" class="btn" title="打开上次保存的默认目录">默认目录</button>
+
+        <button id="btn-theme" class="btn" title="自定义代码块配色">🎨 主题</button>
+          <button id="btn-save-theme" class="btn" title="将当前编辑的主题保存到预设主题">💾 保存主题</button>
+
+        <button id="btn-export" class="btn" title="导出当前主题 JSON">导出主题</button>
+        <button id="btn-import" class="btn" title="导入主题 JSON">导入主题</button>
+        <input type="file" id="file-input" accept=".md,.markdown,.mdown,.mkd,.txt,text/markdown" hidden>
+        <input type="file" id="folder-input" webkitdirectory hidden>
+        <input type="file" id="theme-input" accept=".json,application/json" hidden>
+      </div>
+      <div class="toolbar-right">
+        <input type="search" id="search-box" class="search-box" placeholder="过滤文件...">
+      </div>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <span>文档列表</span>
+          <span id="file-count" class="file-count"></span>
+        </div>
+        <div id="file-tree" class="file-tree"></div>
+        <div id="empty-tip" class="empty-tip">
+          点击「打开文件夹」浏览 Markdown 文档，<br>
+          或「打开文件」查看单个文档。
+        </div>
+      </aside>
+
+      <main class="content">
+        <div id="markdown-body" class="markdown-body"></div>
+        <div id="welcome" class="welcome">
+          <h1>欢迎使用 Markdown Viewer</h1>
+          <p>这是一个 GitHub 风格的 Markdown 文档浏览器，支持：</p>
+          <ul>
+            <li>打开 / 拖入 <code>.md</code> 文件或整个文件夹</li>
+            <li>GFM 基础渲染：标题、列表、表格、引用、任务列表等</li>
+            <li>代码块语法高亮，并支持高度自定义配色</li>
+            <li>主题导入 / 导出，设置自动保存在本地浏览器</li>
+          </ul>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 主题编辑器抽屉 -->
+  <div id="theme-drawer" class="theme-drawer" aria-hidden="true">
+    <div class="drawer-mask" id="drawer-mask"></div>
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <h2>🎨 代码块配色定制</h2>
+        <button id="btn-close-theme" class="btn-icon" aria-label="关闭">✕</button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="form-row">
+          <label for="theme-preset">预设主题</label>
+          <select id="theme-preset">
+            <option value="github-light">GitHub Light</option>
+            <option value="github-dark">GitHub Dark</option>
+            <option value="atom-one-dark">Atom One Dark</option>
+            <option value="dracula">Dracula</option>
+            <option value="solarized-light">Solarized Light</option>
+              <option value="keepalived">Keepalived Config</option>
+
+            <option value="custom">自定义</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <label class="switch-label">
+            <input type="checkbox" id="theme-dark-toggle">
+            <span>使用深色文档背景</span>
+          </label>
+        </div>
+
+          <div class="form-row">
+            <label for="text-size">正文字号（px）</label>
+            <input type="number" id="text-size" min="12" max="40" step="1" value="16">
+          </div>
+
+          <div class="form-row">
+            <label for="code-size">代码块字号（px）</label>
+            <input type="number" id="code-size" min="10" max="40" step="0.5" value="13.5">
+          </div>
+
+            <div class="form-row">
+              <label for="inline-code-size">行内代码字号（px）</label>
+              <input type="number" id="inline-code-size" min="10" max="40" step="0.5" value="12">
+            </div>
+
+
+
+        <div class="form-row">
+          <label>代码块配色</label>
+          <div id="color-editor" class="color-editor"></div>
+        </div>
+
+          <div class="form-row">
+            <label for="custom-css">高级 CSS（可选，可针对具体语言覆盖）</label>
+            <textarea id="custom-css" rows="5" placeholder="例如：&#10;.markdown-body .language-python .hljs-keyword { color: #ff0000; }&#10;.markdown-body .language-js .hljs-string { color: #00aa00; }"></textarea>
+          </div>
+
+
+        <div class="drawer-actions">
+          <button id="btn-reset-theme" class="btn">恢复预设</button>
+          <button id="btn-copy-theme" class="btn">复制 JSON</button>
+          <button id="btn-download-theme" class="btn btn-primary">下载主题 JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- 文档列表右键菜单 -->
+  <div id="context-menu" class="context-menu" hidden>
+    <button id="ctx-rename" class="context-menu-item">✏️ 重命名</button>
+  </div>
+
+  <script src="app.js?v=6.8"></script>
+</body>
+</html>
