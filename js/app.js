@@ -2017,7 +2017,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v6.8)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v6.9)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

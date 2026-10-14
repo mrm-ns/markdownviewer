@@ -71,6 +71,8 @@ markdownviewer/
 ├── app.js              # 主入口，自动加载 js/ 下的子配置
 ├── hutao.ico            # 主目录图标（favicon / header 图标）
 ├── compute_icon_hash.py # 计算 hutao.ico 的 SHA-256 哈希码
+├── ENVIRONMENT.md       # 环境要求说明
+
 
 ├── css/
 │   └── style.css       # 应用布局 / 侧边栏 / 主题面板样式
@@ -90,6 +92,10 @@ markdownviewer/
 ├── themes/
 │   └── keepalived.theme.json # Keepalived 配色主题，可直接导入
 ├── make_backup.py       # 按当前版本号生成 zip 备份
+├── start.bat            # Windows 启动脚本
+├── start.sh             # Linux / macOS 启动脚本
+├── package_environment.py # 打包项目+环境脚本为 zip
+
 └── README.md
 
 ```

@@ -50,19 +50,28 @@
       return false;
     }
 
-    var response = await fetch('hutao.ico', { cache: 'no-store' });
-    if (!response.ok) {
-      showFatalError('无法读取主目录图标 hutao.ico，应用无法启动。');
-      return false;
-    }
+    try {
+      var response = await fetch('hutao.ico', { cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
 
-    var buffer = await response.arrayBuffer();
-    var hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-    var hashArray = Array.from(new Uint8Array(hashBuffer));
-    var hashHex = hashArray.map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+      var buffer = await response.arrayBuffer();
+      if (!window.crypto || !window.crypto.subtle) throw new Error('Web Crypto 不可用');
 
-    if (hashHex.toLowerCase() !== EXPECTED_ICON_HASH.toLowerCase()) {
-      showFatalError('图标校验失败：当前 hutao.ico 不是预期的图标，应用无法启动。');
+      var hashBuffer = await window.crypto.subtle.digest('SHA-256', buffer);
+      var hashArray = Array.from(new Uint8Array(hashBuffer));
+      var hashHex = hashArray.map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+
+      if (hashHex.toLowerCase() !== EXPECTED_ICON_HASH.toLowerCase()) {
+        showFatalError('图标校验失败：当前 hutao.ico 不是预期的图标，应用无法启动。');
+        return false;
+      }
+    } catch (e) {
+      // file:// 或浏览器安全策略限制下无法 fetch 本地文件
+      if (window.location.protocol === 'file:') {
+        console.warn('[Markdown Viewer] file:// 模式下跳过图标哈希校验（浏览器限制无法读取本地文件）');
+        return true;
+      }
+      showFatalError('无法读取主目录图标 hutao.ico，应用无法启动。' + (e && e.message ? ' ' + e.message : ''));
       return false;
     }
 
