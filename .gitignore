@@ -1,0 +1,6 @@
+# Build artifacts
+markdown-viewer-portable.zip
+
+# Python
+__pycache__/
+*.py[cod]
