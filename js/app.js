@@ -434,12 +434,21 @@
   const state = {
     files: [],          // [{ path, name, file }]
     currentPath: null,
+    currentText: null,
+    undoStack: [],
+    undoStacks: {},
     theme: completeTheme({ name: 'github-light', isDark: false, colors: {} }),
     search: '',
+    searchMode: 'name',
+    contentSearchResults: null,
     settings: { textSize: 16, codeSize: 13.5, inlineCodeSize: 12 },
     imageMap: {},       // path -> objectURL，用于相对路径图片
     dirHandle: null,    // File System Access API 的当前目录句柄
-    userThemes: []      // 用户导入的主题，会出现在预设下拉框中
+    dirReadOnly: false, // 当前目录是否为只读模式
+    userThemes: [],     // 用户导入的主题，会出现在预设下拉框中
+    sidebarTab: 'files',
+    sidebarCollapsed: false,
+    toolbarCollapsed: false
   };
 
   // ---------- 自定义语言支持 ----------
@@ -574,7 +583,8 @@
       bash: BASH_RULES,
       ini: INI_RULES,
       conf: CONF_RULES,
-        yaml: []
+        yaml: [],
+        text: []
     };
     return fallback[name] || [];
   }
@@ -589,6 +599,8 @@
     if (l === 'ini') return highlightWithRules(code, getSyntaxRules('ini'));
     if (l === 'nginx' || l === 'conf' || l === 'config' || l === 'cfg') return highlightWithRules(code, getSyntaxRules('conf'));
     if (l === 'yaml' || l === 'yml') return highlightWithRules(code, getSyntaxRules('yaml'));
+    if (l === 'text' || l === 'txt') return highlightWithRules(code, getSyntaxRules('text'));
+    if (l === 'sql' || l === 'mysql' || l === 'mariadb' || l === 'postgresql' || l === 'postgres' || l === 'sqlite' || l === 'plsql' || l === 'tsql') return highlightWithRules(code, getSyntaxRules('sql'));
     return escapeHtml(code);
   }
 
@@ -633,8 +645,8 @@
 
   function builtinInline(text) {
     let s = text;
-    s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g, '<img src="$2" alt="$1">');
-    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g, '<a href="$2">$1</a>');
+    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">');
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
     s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
     s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
@@ -646,15 +658,19 @@
     return line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|');
   }
 
-  function builtinParseList(lines, start) {
+  function builtinParseList(lines, start, baseOffset) {
+    const offset = baseOffset || 0;
     const ordered = /^\s*\d+\.\s+/.test(lines[start]);
     const items = [];
     let i = start;
-    const markerRe = ordered ? /^(\s*)\d+\.\s+(.*)$/ : /^(\s*)[-*+]\s+(.*)$/;
+    const markerRe = ordered ? /^(\s*)(\d+)\.\s+(.*)$/ : /^(\s*)([-*+])\s+(.*)$/;
     while (i < lines.length) {
       const m = lines[i].match(markerRe);
       if (!m) break;
-      const content = m[2];
+      const itemLine = i;
+      const indent = m[1].length;
+      const content = m[3];
+      const contentIndent = indent + m[2].length + 1;
       const task = content.match(/^\[( |x|X)\]\s+(.*)$/);
       let inner;
       if (task) {
@@ -663,14 +679,54 @@
       } else {
         inner = builtinInline(escapeHtml(content));
       }
-      items.push('<li>' + inner + '</li>');
       i++;
+
+      // 收集当前列表项下缩进的内容（嵌套引用、代码块、图片、嵌套列表等）
+        const nestedStart = i;
+
+      const nestedLines = [];
+      while (i < lines.length) {
+        const line = lines[i];
+        const lineIndent = (line.match(/^\s*/) || [''])[0].length;
+        const trimmed = line.trim();
+
+        if (trimmed === '') {
+          let j = i + 1;
+          while (j < lines.length && lines[j].trim() === '') j++;
+          if (j < lines.length) {
+            const nextIndent = (lines[j].match(/^\s*/) || [''])[0].length;
+            if (nextIndent > indent) {
+              nestedLines.push('');
+              i++;
+              continue;
+            }
+          }
+          break;
+        }
+
+        // 同一层级的下一个列表项，结束当前项
+        if (/^\s*([-*+]|\d+\.)\s+/.test(line) && lineIndent <= indent) break;
+
+        if (lineIndent > indent) {
+          nestedLines.push(line.slice(Math.min(contentIndent, line.length)));
+          i++;
+        } else {
+          break;
+        }
+      }
+
+      let nestedHtml = '';
+      if (nestedLines.length) {
+        nestedHtml = builtinMarkdown(nestedLines.join('\n'), nestedStart + offset);
+      }
+      items.push('<li data-source-line="' + (itemLine + offset) + '">' + inner + nestedHtml + '</li>');
     }
     const tag = ordered ? 'ol' : 'ul';
     return { html: '<' + tag + '>' + items.join('') + '</' + tag + '>', next: i };
   }
 
-  function builtinMarkdown(text) {
+  function builtinMarkdown(text, baseOffset) {
+    const offset = baseOffset || 0;
     const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
     let html = '';
     let i = 0;
@@ -683,7 +739,8 @@
 
       const fence = line.match(/^\s*```([^\s]*)?\s*$/);
       if (fence) {
-        const lang = (fence[1] || '').trim();
+        const fenceStart = i;
+          const lang = (fence[1] || '').trim();
         const buf = [];
         i++;
         while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) {
@@ -691,7 +748,7 @@
           i++;
         }
         if (i < lines.length) i++;
-        html += '<pre><code class="hljs language-' + escapeHtml(lang) + '">' + highlightCode(buf.join('\n'), lang) + '</code></pre>';
+        html += '<pre data-source-line="' + (fenceStart + offset) + '"><code class="hljs language-' + escapeHtml(lang) + '">' + highlightCode(buf.join('\n'), lang) + '</code></pre>';
         continue;
       }
 
@@ -699,7 +756,7 @@
       if (heading) {
         const level = heading[1].length;
         const headingId = slugify(heading[2]);
-          html += '<h' + level + ' id="' + escapeHtml(headingId) + '">' + builtinInline(escapeHtml(heading[2])) + '</h' + level + '>';
+          html += '<h' + level + ' id="' + escapeHtml(headingId) + '" data-source-line="' + (i + offset) + '">' + builtinInline(escapeHtml(heading[2])) + '</h' + level + '>';
         i++;
         continue;
       }
@@ -711,12 +768,14 @@
       }
 
       if (/^\s*>\s?/.test(line)) {
+          const blockquoteStart = i;
+
         const buf = [];
         while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
           buf.push(lines[i].replace(/^\s*>\s?/, ''));
           i++;
         }
-        html += '<blockquote>' + builtinMarkdown(buf.join('\n')) + '</blockquote>';
+        html += '<blockquote data-source-line="' + (blockquoteStart + offset) + '">' + builtinMarkdown(buf.join('\n'), blockquoteStart + offset) + '</blockquote>';
         continue;
       }
 
@@ -741,13 +800,14 @@
       }
 
       if (/^\s*([-*+]|\d+\.)\s+/.test(line)) {
-        const parsed = builtinParseList(lines, i);
+        const parsed = builtinParseList(lines, i, offset);
         html += parsed.html;
         i = parsed.next;
         continue;
       }
 
-      const buf = [line];
+      const startLine = i;
+        const buf = [line];
       i++;
       while (i < lines.length && lines[i].trim() !== '' &&
              !/^(#{1,6})\s/.test(lines[i]) &&
@@ -757,7 +817,7 @@
         buf.push(lines[i]);
         i++;
       }
-      html += '<p>' + buf.map(function (l) {
+      html += '<p data-source-line="' + (startLine + offset) + '">' + buf.map(function (l) {
         return builtinInline(escapeHtml(l));
       }).join('<br>') + '</p>';
     }
@@ -932,6 +992,9 @@
       });
     }
 
+    renderOutline();
+
+
   }
 
 
@@ -950,6 +1013,7 @@
   function indexFiles(fileList) {
     resetImageMap();
     state.dirHandle = null;
+    state.dirReadOnly = false;
 
     const files = [];
     const imageMap = {};
@@ -977,6 +1041,52 @@
       toast('已加载 ' + files.length + ' 个文档');
     } else {
       toast('没有找到 Markdown 文件');
+    }
+  }
+
+  // 追加单个文件到现有列表（去重），不替换已有文件
+  function appendFiles(fileList) {
+    var added = 0;
+    for (var i = 0; i < fileList.length; i++) {
+      var file = fileList[i];
+      if (!isMarkdownFile(file.name)) continue;
+      var path = file.webkitRelativePath || file.name;
+      // 去重：同名文件已存在则跳过
+      var exists = false;
+      for (var j = 0; j < state.files.length; j++) {
+        if (state.files[j].name === file.name) {
+          exists = true;
+          break;
+        }
+      }
+      if (!exists) {
+        state.files.push({ path: path, name: file.name, file: file });
+        added++;
+      }
+    }
+    if (added > 0) {
+      state.files.sort(function (a, b) {
+        return a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' });
+      });
+      renderTree();
+      // 打开最新添加的第一个文件
+      var firstNew = null;
+      for (var k = 0; k < fileList.length; k++) {
+        if (isMarkdownFile(fileList[k].name)) {
+          var n = fileList[k].name;
+          for (var m = 0; m < state.files.length; m++) {
+            if (state.files[m].name === n) {
+              firstNew = state.files[m];
+              break;
+            }
+          }
+          if (firstNew) break;
+        }
+      }
+      if (firstNew) openFile(firstNew);
+      toast('已添加 ' + added + ' 个文档，共 ' + state.files.length + ' 个');
+    } else {
+      toast('文件已在列表中或不是 Markdown 文件');
     }
   }
 
@@ -1059,7 +1169,9 @@
     }
 
     let renamedOnDisk = false;
-    if (state.dirHandle) {
+    if (state.dirReadOnly) {
+      toast('当前目录为只读模式，无法在磁盘上重命名');
+    } else if (state.dirHandle) {
       try {
         const parentHandle = await getDirectoryHandleByPath(state.dirHandle, dir);
         const fileHandle = await parentHandle.getFileHandle(item.name);
@@ -1091,11 +1203,16 @@
     const container = document.getElementById('file-tree');
     const emptyTip = document.getElementById('empty-tip');
     const countEl = document.getElementById('file-count');
-    const filtered = state.search
+    let filtered;
+      if (state.searchMode === 'content' && state.contentSearchResults) {
+        filtered = state.contentSearchResults;
+      } else {
+        filtered = state.search
       ? state.files.filter(function (f) {
           return f.path.toLowerCase().includes(state.search.toLowerCase());
         })
       : state.files;
+      }
 
     countEl.textContent = filtered.length ? filtered.length + ' 个文件' : '';
     if (filtered.length === 0) {
@@ -1106,6 +1223,30 @@
     emptyTip.style.display = 'none';
     container.innerHTML = renderNode(buildTree(filtered));
   }
+
+  async function performContentSearch(query) {
+    const keyword = (query || '').toLowerCase();
+    if (!keyword) {
+      state.contentSearchResults = null;
+      renderTree();
+      return;
+    }
+    const results = [];
+    for (const item of state.files) {
+      try {
+        const file = await getFreshFile(item);
+        const text = await readFileText(file);
+        if (text.toLowerCase().includes(keyword)) {
+          results.push(item);
+        }
+      } catch (e) {
+        // 忽略无法读取的文件
+      }
+    }
+    state.contentSearchResults = results;
+    renderTree();
+  }
+
 
   function renderNode(node) {
     let html = '<ul class="tree">';
@@ -1129,12 +1270,122 @@
     return html;
   }
 
+  // ---------- 侧边栏：文档列表 + 当前大纲 ----------
+  function renderOutline() {
+    const container = document.getElementById('outline-tree');
+    if (!container) return;
+    const headings = document.querySelectorAll('#markdown-body h1, #markdown-body h2, #markdown-body h3, #markdown-body h4, #markdown-body h5, #markdown-body h6');
+    let html = '';
+    headings.forEach(function (h) {
+      const level = parseInt(h.tagName.charAt(1), 10);
+      const id = h.id;
+      const text = h.textContent || '';
+      html += '<div class="outline-item" data-target="' + escapeHtml(id) + '" style="padding-left:' + (level * 12) + 'px">' + escapeHtml(text) + '</div>';
+    });
+    container.innerHTML = html || '<div class="empty-tip">当前文档没有标题</div>';
+  }
+
+  function setSidebarTab(tab) {
+    state.sidebarTab = tab;
+    const filesPanel = document.getElementById('files-panel');
+    const outlinePanel = document.getElementById('outline-panel');
+    const title = document.getElementById('sidebar-title');
+    document.querySelectorAll('.sidebar-tab').forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-sidebar-tab') === tab);
+    });
+    if (filesPanel) filesPanel.hidden = tab !== 'files';
+    if (outlinePanel) outlinePanel.hidden = tab !== 'outline';
+    if (title) title.textContent = tab === 'files' ? '文档列表' : '当前大纲';
+    if (tab === 'outline') renderOutline();
+  }
+
+  function updateSidebarHandle() {
+    const handle = document.getElementById('sidebar-toggle-handle');
+    if (handle) handle.textContent = state.sidebarCollapsed ? '▶' : '◀';
+  }
+
+  function toggleSidebar() {
+    state.sidebarCollapsed = !state.sidebarCollapsed;
+    document.body.classList.toggle('sidebar-collapsed', state.sidebarCollapsed);
+    updateSidebarHandle();
+    try {
+      localStorage.setItem('markdown-viewer-sidebar-collapsed', state.sidebarCollapsed ? '1' : '0');
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function loadSidebarState() {
+    try {
+      state.sidebarCollapsed = localStorage.getItem('markdown-viewer-sidebar-collapsed') === '1';
+    } catch (e) {
+      // ignore
+    }
+    document.body.classList.toggle('sidebar-collapsed', state.sidebarCollapsed);
+    updateSidebarHandle();
+  }
+
+  function updateToolbarHandle() {
+    const handle = document.getElementById('toolbar-expand-handle');
+    if (handle) handle.hidden = !state.toolbarCollapsed;
+  }
+
+  function toggleToolbar() {
+    state.toolbarCollapsed = !state.toolbarCollapsed;
+    document.body.classList.toggle('toolbar-collapsed', state.toolbarCollapsed);
+    updateToolbarHandle();
+    try {
+      localStorage.setItem('markdown-viewer-toolbar-collapsed', state.toolbarCollapsed ? '1' : '0');
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function loadToolbarState() {
+    try {
+      state.toolbarCollapsed = localStorage.getItem('markdown-viewer-toolbar-collapsed') === '1';
+    } catch (e) {
+      // ignore
+    }
+    document.body.classList.toggle('toolbar-collapsed', state.toolbarCollapsed);
+    updateToolbarHandle();
+  }
+
+
+
+  async function getFreshFile(item) {
+    if (!state.dirHandle || !item) return item.file;
+    try {
+      const dir = item.path.indexOf('/') >= 0 ? item.path.replace(/[^/]*$/, '') : '';
+      const parentHandle = await getDirectoryHandleByPath(state.dirHandle, dir);
+      const fileHandle = await parentHandle.getFileHandle(item.name);
+      const freshFile = await fileHandle.getFile();
+      item.file = freshFile;
+      return freshFile;
+    } catch (e) {
+      console.warn('获取最新文件失败，使用缓存文件', e);
+      return item.file;
+    }
+  }
+
+
   async function openFile(item) {
     if (!item || !item.file) return;
     try {
-      const text = await readFileText(item.file);
+      const file = await getFreshFile(item);
+      const text = await readFileText(file);
       state.currentPath = item.path;
+        state.currentText = text;
+        if (!state.undoStacks[item.path]) {
+            state.undoStacks[item.path] = [];
+          }
+          state.undoStack = state.undoStacks[item.path];
+
       renderMarkdown(text);
+        const contentEl = document.querySelector('.content');
+        if (contentEl) contentEl.scrollTop = 0;
+        window.scrollTo(0, 0);
+
       document.title = item.name + ' - Markdown Viewer';
       renderTree();
     } catch (err) {
@@ -1147,6 +1398,317 @@
     const item = state.files.find(function (f) { return f.path === path; });
     if (item) openFile(item);
   }
+
+  // ---------- 正文编辑与撤销 ----------
+  async function writeCurrentTextToDisk(text) {
+    if (!state.dirHandle || !state.currentPath) return false;
+    try {
+      const item = state.files.find(function (f) { return f.path === state.currentPath; });
+      if (!item) return false;
+      const dir = state.currentPath.indexOf('/') >= 0 ? state.currentPath.replace(/[^/]*$/, '') : '';
+      const parentHandle = await getDirectoryHandleByPath(state.dirHandle, dir);
+      const fileHandle = await parentHandle.getFileHandle(item.name);
+      const writable = await fileHandle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      return true;
+    } catch (e) {
+      console.warn('写回磁盘失败', e);
+      return false;
+    }
+  }
+
+  function applySourceChange(newText) {
+    if (state.currentText == null) return;
+    state.undoStack.push(state.currentText);
+    if (state.undoStack.length > 20) state.undoStack.shift();
+    state.currentText = newText;
+  
+
+
+
+
+
+
+
+
+
+
+
+      renderMarkdown(newText);
+
+    writeCurrentTextToDisk(newText).then(function (ok) {
+    renderMarkdown(newText);
+    if (ok) {
+      toast('已保存修改');
+    } else {
+      toast('已更新内存，但无法写回磁盘');
+    }
+  }
+    );
+  }
+
+
+
+  function resolveSourceLine(el, fallbackLine) {
+    const text = (el.textContent || '').trim();
+    const lines = state.currentText ? state.currentText.split('\n') : [];
+
+    if (fallbackLine >= 0 && fallbackLine < lines.length) {
+      const src = lines[fallbackLine];
+      if (src.includes(text) || text.includes(src.trim())) {
+        return fallbackLine;
+      }
+    }
+
+    if (el.tagName === 'PRE') {
+      const code = ((el.querySelector('code') || el).textContent || '').replace(/\n$/, '').trim();
+      for (let i = 0; i < lines.length; i++) {
+        if (/^\s*```/.test(lines[i])) {
+          const buf = [];
+            const fenceIndent = (lines[i].match(/^\s*/) || [''])[0].length;
+
+          let j = i + 1;
+          while (j < lines.length && !/^\s*```\s*$/.test(lines[j])) {
+            const raw = lines[j];
+              buf.push(raw.length > fenceIndent ? raw.slice(fenceIndent) : raw.trimStart());
+            j++;
+          }
+          const blockCode = buf.join('\n').replace(/\n$/, '').trim();
+            if (blockCode === code || blockCode.includes(code) || code.includes(blockCode)) return i;
+        }
+      }
+      } else if (el.tagName === 'BLOCKQUOTE') {
+        for (let i = 0; i < lines.length; i++) {
+          if (/^\s*>/.test(lines[i])) {
+            const buf = [];
+            let j = i;
+            while (j < lines.length && /^\s*>/.test(lines[j])) {
+              buf.push(lines[j].replace(/^\s*>\s?/, ''));
+              j++;
+            }
+            const joined = buf.join(' ').replace(/\s+/g, ' ').trim();
+              const normalizedText = text.replace(/\s+/g, ' ').trim();
+            if (joined === normalizedText) return i;
+          }
+        }
+
+    } else if (/^H[1-6]$/.test(el.tagName)) {
+      const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp('^\\s*#{1,6}\\s+' + escaped + '\\s*$');
+      for (let i = 0; i < lines.length; i++) {
+        if (re.test(lines[i])) return i;
+      }
+    } else if (el.tagName === 'LI') {
+      const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp('^\\s*(?:[-*+]|\\d+\\.)\\s+' + escaped + '\\s*$');
+      for (let i = 0; i < lines.length; i++) {
+        if (re.test(lines[i])) return i;
+      }
+    } else {
+      for (let i = 0; i < lines.length; i++) {
+        const t = lines[i].trim();
+        if (t === text || (text && t.includes(text)) || (text && text.includes(t))) return i;
+      }
+    }
+
+    return fallbackLine;
+  }
+
+  function startEditTextElement(el) {
+    const fallbackLine = parseInt(el.getAttribute('data-source-line'), 10);
+    const sourceLine = resolveSourceLine(el, isNaN(fallbackLine) ? -1 : fallbackLine);
+    if (sourceLine < 0) {
+      toast('无法定位到源码行');
+      return;
+    }
+
+    const allLines = state.currentText ? state.currentText.split('\n') : [];
+    let endLine = sourceLine;
+    if (el.tagName === 'BLOCKQUOTE') {
+      while (endLine + 1 < allLines.length && /^\s*>/.test(allLines[endLine + 1])) endLine++;
+    } else if (el.tagName === 'LI' || /^H[1-6]$/.test(el.tagName)) {
+      endLine = sourceLine;
+    } else {
+      while (endLine + 1 < allLines.length &&
+             allLines[endLine + 1].trim() !== '' &&
+             !/^(#{1,6})\s/.test(allLines[endLine + 1]) &&
+             !/^\s*```/.test(allLines[endLine + 1]) &&
+             !/^\s*>\s?/.test(allLines[endLine + 1]) &&
+             !/^\s*([-*+]|\d+\.)\s+/.test(allLines[endLine + 1])) {
+        endLine++;
+      }
+    }
+
+    const oldRaw = allLines.slice(sourceLine, endLine + 1).join('\n').replace(/\r/g, '').replace(/\n$/, '');
+    const textarea = document.createElement('textarea');
+    textarea.className = 'inline-editor';
+    textarea.value = oldRaw;
+    textarea.style.width = '100%';
+    
+    el.innerHTML = '';
+    el.appendChild(textarea);
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+
+    textarea.focus();
+
+    let finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      const newValue = textarea.value.replace(/\n$/, '');
+      if (newValue === oldRaw) {
+          renderMarkdown(state.currentText);
+          return;
+        }
+      const lines = state.currentText.split('\n');
+      const newLines = newValue.split('\n');
+      lines.splice(sourceLine, endLine - sourceLine + 1, ...newLines);
+      applySourceChange(lines.join('\n'));
+    }
+    textarea.addEventListener('blur', finish);
+    textarea.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        textarea.blur();
+      }
+    });
+  }
+
+  function findCodeBlockForOldCode(oldCode) {
+    const lines = state.currentText ? state.currentText.split('\n') : [];
+    const normalizedOld = (oldCode || '').replace(/\n$/, '').trim();
+    for (let i = 0; i < lines.length; i++) {
+      if (/^\s*```/.test(lines[i])) {
+        const fenceIndent = (lines[i].match(/^\s*/) || [''])[0].length;
+        const buf = [];
+        let j = i + 1;
+        while (j < lines.length && !/^\s*```\s*$/.test(lines[j])) {
+          const raw = lines[j];
+          buf.push(raw.length > fenceIndent ? raw.slice(fenceIndent) : raw.trimStart());
+          j++;
+        }
+        if (j < lines.length && /^\s*```\s*$/.test(lines[j])) {
+          const blockCode = buf.join('\n').replace(/\n$/, '').trim();
+          if (blockCode === normalizedOld) {
+            return { start: i, end: j };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+
+  function startEditCodeBlock(pre) {
+    const fallbackLine = parseInt(pre.getAttribute('data-source-line'), 10);
+    let sourceLine = resolveSourceLine(pre, isNaN(fallbackLine) ? -1 : fallbackLine);
+    const code = pre.querySelector('code');
+    const oldCode = code ? code.textContent.replace(/\n$/, '') : '';
+    const allLines = state.currentText ? state.currentText.split('\n') : [];
+    if (fallbackLine >= 0 && fallbackLine < allLines.length && /^\s*```/.test(allLines[fallbackLine])) {
+      sourceLine = fallbackLine;
+    } else {
+      const foundBlock = findCodeBlockForOldCode(oldCode);
+      if (foundBlock) {
+        sourceLine = foundBlock.start;
+      }
+    }
+    if (sourceLine < 0 || sourceLine >= allLines.length || !/^\s*```/.test(allLines[sourceLine])) {
+      toast('无法定位到代码块');
+      return;
+    }
+    const textarea = document.createElement('textarea');
+    textarea.className = 'code-editor';
+    textarea.value = oldCode;
+    textarea.style.width = '100%';
+    
+    textarea.style.fontFamily = 'monospace';
+      textarea.style.height = 'auto';
+      textarea.style.height = textarea.scrollHeight + 'px';
+
+    pre.replaceWith(textarea);
+    textarea.focus();
+
+    let finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      const newCode = textarea.value.replace(/\n$/, '');
+        if (newCode === oldCode) {
+            renderMarkdown(state.currentText);
+            return;
+          }
+      const lines = state.currentText.split('\n');
+      let closeIndex = -1;
+      for (let j = sourceLine + 1; j < lines.length; j++) {
+        if (/^\s*```\s*$/.test(lines[j])) {
+          closeIndex = j;
+          break;
+        }
+      }
+        if (!/^\s*```/.test(lines[sourceLine])) {
+          toast('未找到代码块开始标记');
+          return;
+        }
+
+      if (closeIndex > sourceLine) {
+        const fenceIndent = (lines[sourceLine].match(/^\s*/) || [''])[0].length;
+          const indentPrefix = ' '.repeat(fenceIndent);
+          const newLines = newCode.split('\n').map(function (line) {
+            if (line.trim() === '') return '';
+            return indentPrefix + line;
+          });
+        lines.splice(sourceLine + 1, closeIndex - sourceLine - 1, ...newLines);
+        applySourceChange(lines.join('\n'));
+      } else {
+        toast('未找到代码块结束标记');
+      }
+    }
+    textarea.addEventListener('blur', finish);
+    textarea.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        textarea.blur();
+      }
+    });
+  }
+
+  function undoLastEdit() {
+    if (!state.undoStack.length) {
+      toast('没有可撤销的改动');
+      return;
+    }
+    const previous = state.undoStack.pop();
+    state.currentText = previous;
+    writeCurrentTextToDisk(previous).then(function (ok) {
+      renderMarkdown(previous);
+      if (ok) toast('已撤销上一条改动');
+      else toast('已撤销（内存）');
+    });
+  }
+
+  function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        toast('已复制');
+      }).catch(function () {
+        toast('复制失败');
+      });
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        toast('已复制');
+      } catch (e) {
+        toast('复制失败');
+      }
+      document.body.removeChild(ta);
+    }
+  }
+
 
   // ---------- 文件夹拖拽 ----------
   function readEntry(entry) {
@@ -1269,33 +1831,46 @@
     return out;
   }
 
-  async function openDirectoryPicker() {
-    if (!window.showDirectoryPicker) return false;
-    try {
-      const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-        state.dirHandle = handle;
+  function isFileProtocol() {
+    return window.location.protocol === 'file:';
+  }
 
-      try {
-        await saveDefaultDirectoryHandle(handle);
-      } catch (e) {
-        console.warn('保存默认目录失败', e);
-      }
-      const wrapped = await listFilesFromDirectoryHandle(handle, '');
-      indexWrappedFiles(wrapped);
-      toast('已打开并保存为默认目录');
-      return true;
+  async function openDirectoryPicker() {
+    // file:/// 协议下 showDirectoryPicker 无法访问系统目录（下载、文档等），
+    // 直接跳过，让调用方 fallback 到 <input webkitdirectory>
+    if (isFileProtocol()) return false;
+
+    if (!window.showDirectoryPicker) return false;
+
+    var handle = null;
+    try {
+      handle = await window.showDirectoryPicker({ mode: 'readwrite' });
     } catch (e) {
       if (e && e.name === 'AbortError') return true;
-      console.error(e);
+      console.error('[Markdown Viewer] showDirectoryPicker 失败', e);
       return false;
     }
+
+    state.dirHandle = handle;
+    state.dirReadOnly = false;
+
+    try {
+      await saveDefaultDirectoryHandle(handle);
+    } catch (e) {
+      console.warn('保存默认目录失败', e);
+    }
+    const wrapped = await listFilesFromDirectoryHandle(handle, '');
+    indexWrappedFiles(wrapped);
+    toast('已打开并保存为默认目录');
+    return true;
   }
 
   async function restoreDefaultDirectory() {
     try {
       const handle = await getDefaultDirectoryHandle();
       if (!handle) return;
-        state.dirHandle = handle;
+      state.dirHandle = handle;
+      state.dirReadOnly = false;
 
       const permission = await handle.queryPermission({ mode: 'readwrite' });
       if (permission !== 'granted') return;
@@ -1316,11 +1891,16 @@
         toast('还没有设置默认目录');
         return;
       }
-        state.dirHandle = handle;
+      state.dirHandle = handle;
+      state.dirReadOnly = false;
 
-      let permission = await handle.queryPermission({ mode: 'readwrite' });
+      var permission = await handle.queryPermission({ mode: 'readwrite' });
       if (permission !== 'granted') {
-        permission = await handle.requestPermission({ mode: 'readwrite' });
+        try {
+          permission = await handle.requestPermission({ mode: 'readwrite' });
+        } catch (e) {
+          // ignore
+        }
       }
       if (permission !== 'granted') {
         toast('未获得默认目录访问权限');
@@ -1619,6 +2199,22 @@
       fileInput.click();
     });
 
+      document.getElementById('btn-reload-file').addEventListener('click', function () {
+        if (!state.currentPath) {
+          toast('当前没有打开文件');
+          return;
+        }
+        const item = state.files.find(function (f) { return f.path === state.currentPath; });
+        if (!item) {
+          toast('找不到当前文件');
+          return;
+        }
+        openFile(item).then(function () {
+          toast('文件已刷新');
+        });
+      });
+
+
     document.getElementById('btn-open-folder').addEventListener('click', async function () {
       const handled = await openDirectoryPicker();
         if (!handled) {
@@ -1638,7 +2234,7 @@
     document.getElementById('drawer-mask').addEventListener('click', closeDrawer);
 
     fileInput.addEventListener('change', function () {
-      if (fileInput.files.length) indexFiles(fileInput.files);
+      if (fileInput.files.length) appendFiles(fileInput.files);
     });
 
     folderInput.addEventListener('change', function () {
@@ -1834,8 +2430,28 @@
 
     document.getElementById('search-box').addEventListener('input', debounce(function (e) {
       state.search = e.target.value.trim();
+        if (state.searchMode === 'content') {
+          performContentSearch(state.search);
+          return;
+        }
+
       renderTree();
     }, 150));
+
+      const searchModeSelect = document.getElementById('search-mode');
+      if (searchModeSelect) {
+        searchModeSelect.addEventListener('change', function () {
+          state.searchMode = this.value;
+          state.contentSearchResults = null;
+          state.search = document.getElementById('search-box').value.trim();
+          if (state.searchMode === 'content' && state.search) {
+            performContentSearch(state.search);
+          } else {
+            renderTree();
+          }
+        });
+      }
+
 
     document.getElementById('file-tree').addEventListener('click', function (e) {
       const folderLabel = e.target.closest('.folder-label');
@@ -1852,53 +2468,295 @@
       }
     });
 
-      // 文档列表右键菜单
-      const contextMenu = document.getElementById('context-menu');
-      let contextTargetPath = null;
+      // 侧边栏：文档 / 大纲切换
+      document.querySelectorAll('.sidebar-tab').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          setSidebarTab(btn.getAttribute('data-sidebar-tab'));
+        });
+      });
 
-      function showContextMenu(x, y) {
-        if (!contextMenu) return;
-        contextMenu.hidden = false;
-        contextMenu.style.left = Math.min(x, window.innerWidth - 160) + 'px';
-        contextMenu.style.top = Math.min(y, window.innerHeight - 60) + 'px';
+      const outlineTree = document.getElementById('outline-tree');
+      if (outlineTree) {
+        outlineTree.addEventListener('click', function (e) {
+          const item = e.target.closest('.outline-item');
+          if (item) {
+            const targetId = item.getAttribute('data-target');
+            if (targetId) scrollToAnchor(targetId);
+          }
+        });
       }
 
-      function hideContextMenu() {
-        if (contextMenu) contextMenu.hidden = true;
+      const sidebarToggleHandle = document.getElementById('sidebar-toggle-handle');
+      if (sidebarToggleHandle) {
+        sidebarToggleHandle.addEventListener('click', toggleSidebar);
+      }
+
+        const toolbarCollapseBtn = document.getElementById('toolbar-collapse-btn');
+        const toolbarExpandHandle = document.getElementById('toolbar-expand-handle');
+        if (toolbarCollapseBtn) {
+          toolbarCollapseBtn.addEventListener('click', toggleToolbar);
+        }
+        if (toolbarExpandHandle) {
+          toolbarExpandHandle.addEventListener('click', toggleToolbar);
+        }
+
+
+
+      // 文档列表右键菜单
+      var contextTargetPath = null;
+
+      // 确保菜单挂在 body 上且初始隐藏
+      var ctxMenu = document.getElementById('context-menu');
+      if (ctxMenu && ctxMenu.parentNode !== document.body) {
+        document.body.appendChild(ctxMenu);
+      }
+      if (ctxMenu) ctxMenu.style.display = 'none';
+        if (ctxMenu) ctxMenu.hidden = true;
+
+
+      function showCtxMenu(x, y) {
+        if (!ctxMenu) return;
+          ctxMenu.hidden = false;
+
+        ctxMenu.style.cssText = 'display:block;position:fixed;z-index:99999;' +
+          'left:' + Math.min(x, window.innerWidth - 180) + 'px;' +
+          'top:' + Math.min(y, window.innerHeight - 100) + 'px;' +
+          'min-width:160px;padding:4px;background:var(--drawer-bg);' +
+          'border:1px solid var(--drawer-border);border-radius:8px;box-shadow:var(--shadow);';
+      }
+
+      function hideCtxMenu() {
+        if (ctxMenu) ctxMenu.style.display = 'none';
+          ctxMenu.hidden = true;
+
         contextTargetPath = null;
       }
 
       document.getElementById('file-tree').addEventListener('contextmenu', function (e) {
-        const fileItem = e.target.closest('.file-item');
+        var fileItem = e.target.closest('.file-item');
         if (!fileItem) return;
         e.preventDefault();
+        e.stopPropagation();
         contextTargetPath = fileItem.getAttribute('data-path');
-        showContextMenu(e.clientX, e.clientY);
+        setTimeout(function () { showCtxMenu(e.clientX, e.clientY); }, 0);
       });
 
-      if (contextMenu) {
-        contextMenu.addEventListener('click', function (e) {
-          const btn = e.target.closest('#ctx-rename');
-          if (!btn) return;
-          const targetPath = contextTargetPath;
-          hideContextMenu();
+      if (ctxMenu) {
+        ctxMenu.addEventListener('click', function (e) {
+          var renameBtn = e.target.closest('#ctx-rename');
+          var removeBtn = e.target.closest('#ctx-remove');
+          if (!renameBtn && !removeBtn) return;
+
+          var targetPath = contextTargetPath;
+          hideCtxMenu();
           if (!targetPath) return;
-          const item = state.files.find(function (f) { return f.path === targetPath; });
-          if (!item) return;
-          const newName = window.prompt('请输入新的文件名：', item.name);
-          if (newName) renameFile(targetPath, newName);
+
+          if (renameBtn) {
+            var item = state.files.find(function (f) { return f.path === targetPath; });
+            if (!item) return;
+            var newName = window.prompt('请输入新的文件名：', item.name);
+            if (newName) renameFile(targetPath, newName);
+          } else if (removeBtn) {
+            var idx = state.files.findIndex(function (f) { return f.path === targetPath; });
+            if (idx < 0) return;
+            var removed = state.files.splice(idx, 1)[0];
+            if (state.currentPath === targetPath) {
+              state.currentPath = null;
+              document.getElementById('markdown-body').innerHTML = '';
+              document.getElementById('welcome').style.display = '';
+              document.title = 'Markdown Viewer';
+            }
+            renderTree();
+            toast('已移除：' + removed.name + '（剩余 ' + state.files.length + ' 个文件）');
+          }
         });
       }
 
-      window.addEventListener('click', function () {
-        hideContextMenu();
+      // 点击页面任意位置关闭菜单
+      document.addEventListener('mousedown', function (e) {
+        if (ctxMenu && ctxMenu.style.display !== 'none' && !ctxMenu.contains(e.target)) {
+          hideCtxMenu();
+        }
       });
-      window.addEventListener('blur', function () {
-        hideContextMenu();
-      });
+
       document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') hideContextMenu();
+        if (e.key === 'Escape') hideCtxMenu();
       });
+
+      // 正文右键菜单：复制 / 编辑
+      var contentCtxMenu = document.getElementById('content-context-menu');
+        if (!contentCtxMenu) {
+          contentCtxMenu = document.createElement('div');
+          contentCtxMenu.id = 'content-context-menu';
+          contentCtxMenu.className = 'context-menu';
+          contentCtxMenu.innerHTML = '<button id="ctx-content-copy" class="context-menu-item">📋 复制</button>' +
+            '<button id="ctx-content-edit" class="context-menu-item">✏️ 编辑</button>';
+          document.body.appendChild(contentCtxMenu);
+        }
+      var contentContextTarget = null;
+        contentCtxMenu.style.display = 'none';
+        contentCtxMenu.hidden = true;
+
+
+        function showContentCtxMenu(x, y) {
+          var old = document.getElementById('content-context-menu');
+          if (old && old.parentNode) old.parentNode.removeChild(old);
+
+          var menu = document.createElement('div');
+          menu.id = 'content-context-menu';
+          menu.className = 'context-menu';
+          menu.style.cssText = 'display:block;position:fixed;z-index:99999;' +
+            'left:' + Math.min(x, window.innerWidth - 180) + 'px;' +
+            'top:' + Math.min(y, window.innerHeight - 100) + 'px;' +
+            'min-width:160px;padding:4px;background:var(--drawer-bg);' +
+            'border:1px solid var(--drawer-border);border-radius:8px;box-shadow:var(--shadow);';
+          menu.innerHTML = '<button id="ctx-content-copy" class="context-menu-item">📋 复制</button>' +
+            '<button id="ctx-content-edit" class="context-menu-item">✏️ 编辑</button>';
+
+          menu.addEventListener('click', function (e) {
+            var copyBtn = e.target.closest('#ctx-content-copy');
+            var editBtn = e.target.closest('#ctx-content-edit');
+            if (!copyBtn && !editBtn) return;
+            var target = contentContextTarget;
+            hideContentCtxMenu();
+            if (!target) return;
+
+            if (copyBtn) {
+              var selectedText = window.getSelection ? window.getSelection().toString() : '';
+              if (selectedText) {
+                copyTextToClipboard(selectedText);
+                return;
+              }
+              if (target.tagName === 'PRE') {
+                var codeEl = target.querySelector('code');
+                copyTextToClipboard(codeEl ? codeEl.textContent : target.textContent);
+              } else {
+                copyTextToClipboard(target.textContent || '');
+              }
+            } else if (editBtn) {
+              if (target.tagName === 'PRE') {
+                startEditCodeBlock(target);
+              } else {
+                startEditTextElement(target);
+              }
+            }
+          });
+
+          document.body.appendChild(menu);
+          contentCtxMenu = menu;
+        }
+
+      function showContentCtxMenu_old(x, y) {
+        if (!contentCtxMenu) return;
+        contentCtxMenu.hidden = false;
+          contentCtxMenu.removeAttribute('hidden');
+
+        contentCtxMenu.style.cssText = 'display:block;position:fixed;z-index:99999;' +
+          'left:' + Math.min(x, window.innerWidth - 180) + 'px;' +
+          'top:' + Math.min(y, window.innerHeight - 100) + 'px;' +
+          'min-width:160px;padding:4px;background:var(--drawer-bg);' +
+          'border:1px solid var(--drawer-border);border-radius:8px;box-shadow:var(--shadow);';
+      }
+
+      function hideContentCtxMenu() {
+        if (contentCtxMenu) {
+          contentCtxMenu.hidden = true;
+          contentCtxMenu.style.display = 'none';
+        }
+        contentContextTarget = null;
+      }
+
+      var markdownBodyForMenu = document.getElementById('markdown-body');
+      if (markdownBodyForMenu) {
+        markdownBodyForMenu.addEventListener('contextmenu', function (e) {
+          var pre = e.target.closest('pre');
+          var blockquote = e.target.closest('blockquote');
+            var textEl = e.target.closest('h1,h2,h3,h4,h5,h6,p,li');
+            if (blockquote) textEl = blockquote;
+
+          if (!pre && !textEl) return;
+          e.preventDefault();
+          e.stopPropagation();
+          contentContextTarget = pre || textEl;
+          setTimeout(function () { showContentCtxMenu(e.clientX, e.clientY); }, 0);
+        });
+      }
+
+      // 兜底：如果 markdown-body 上的右键监听未生效，用 document 级监听
+      document.addEventListener('contextmenu', function (e) {
+        if (e.defaultPrevented) return;
+        var t = e.target;
+        if (!t || !t.closest || !t.closest('#markdown-body')) return;
+        var pre = t.closest('pre');
+        var blockquote = t.closest('blockquote');
+          var textEl = t.closest('h1,h2,h3,h4,h5,h6,p,li');
+          if (blockquote) textEl = blockquote;
+
+        if (!pre && !textEl) return;
+        e.preventDefault();
+        contentContextTarget = pre || textEl;
+        setTimeout(function () { showContentCtxMenu(e.clientX, e.clientY); }, 0);
+      });
+
+
+      if (contentCtxMenu) {
+        contentCtxMenu.addEventListener('click', function (e) {
+          var copyBtn = e.target.closest('#ctx-content-copy');
+          var editBtn = e.target.closest('#ctx-content-edit');
+          if (!copyBtn && !editBtn) return;
+          var target = contentContextTarget;
+          hideContentCtxMenu();
+          if (!target) return;
+
+          if (copyBtn) {
+              var selectedText = window.getSelection ? window.getSelection().toString() : '';
+              if (selectedText) {
+                copyTextToClipboard(selectedText);
+                return;
+              }
+
+            if (target.tagName === 'PRE') {
+              var codeEl = target.querySelector('code');
+              copyTextToClipboard(codeEl ? codeEl.textContent : target.textContent);
+            } else {
+              copyTextToClipboard(target.textContent || '');
+            }
+          } else if (editBtn) {
+            if (target.tagName === 'PRE') {
+              startEditCodeBlock(target);
+            } else {
+              startEditTextElement(target);
+            }
+          }
+        });
+      }
+
+      document.addEventListener('mousedown', function (e) {
+        if (contentCtxMenu && contentCtxMenu.style.display !== 'none' && !contentCtxMenu.contains(e.target)) {
+          hideContentCtxMenu();
+        }
+      });
+
+      // 点击编辑器外部时，强制让编辑器失焦，从而触发保存
+      document.addEventListener('mousedown', function (e) {
+        if (e.target.closest && (e.target.closest('.code-editor') || e.target.closest('.inline-editor'))) return;
+        var active = document.activeElement;
+        if (active && (active.classList.contains('code-editor') || active.classList.contains('inline-editor'))) {
+          active.blur();
+        }
+      });
+
+
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') hideContentCtxMenu();
+      });
+
+      // 撤销改动按钮
+      var undoBtn = document.getElementById('btn-undo-edit');
+      if (undoBtn) {
+        undoBtn.addEventListener('click', undoLastEdit);
+      }
+
 
 
       // 工作区内部 Markdown 跳转
@@ -1958,6 +2816,7 @@
           const wrappedLists = await Promise.all(entries.map(readEntry));
           const wrapped = wrappedLists.flat();
             state.dirHandle = null;
+            state.dirReadOnly = false;
 
             indexWrappedFiles(wrapped);
             return;
@@ -2017,7 +2876,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v6.9)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.0.3)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
@@ -2025,6 +2884,9 @@
     loadUserThemes();
     renderThemePresets();
     restoreTheme();
+    loadSidebarState();
+    loadToolbarState();
+    setSidebarTab(state.sidebarTab);
     bindEvents();
     renderTree();
     restoreDefaultDirectory();

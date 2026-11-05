@@ -1,0 +1,15 @@
+/* Apache 代码块高亮子配置 */
+(function () {
+  'use strict';
+
+  window.MD_SYNTAX_RULES = window.MD_SYNTAX_RULES || {};
+
+  window.MD_SYNTAX_RULES.apache = [
+    { className: 'comment', pattern: /^\s*#[^\n]*/ },
+    { className: 'string', pattern: /"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/ },
+    { className: 'number', pattern: /\b\d+\b/ },
+    { className: 'variable', pattern: /\$\{[^}]+\}|\$\w+|%\{[^}]+\}/ },
+    { className: 'symbol', pattern: /[<>\/=()]/ },
+    { className: 'keyword', pattern: /(?<=^|\s)(?:ServerRoot|Listen|ServerName|ServerAdmin|DocumentRoot|Directory|VirtualHost|Location|Files|IfModule|LoadModule|User|Group|PidFile|ErrorLog|CustomLog|LogLevel|Options|AllowOverride|Require|Order|Allow|Deny|SetEnv|RewriteEngine|RewriteRule|RewriteCond|Alias|ScriptAlias|Redirect|ProxyPass|ProxyPassReverse|SSLEngine|SSLCertificateFile|SSLCertificateKeyFile|Include|IncludeOptional|Timeout|KeepAlive|MaxKeepAliveRequests|KeepAliveTimeout|HostnameLookups|AddType|AddOutputFilter|Header|RequestHeader|LogFormat|TypesConfig|AccessFileName|DefaultType|ErrorDocument|DirectoryIndex|IndexIgnore|AddDefaultCharset|AddCharset|AddLanguage|LanguagePriority|ForceLanguagePriority|SetHandler|AddHandler|Action|ScriptAliasMatch|AliasMatch|RedirectMatch|RewriteMap|RewriteBase|RewriteOptions|RewriteLog|RewriteLogLevel|BrowserMatch|BrowserMatchNoCase|SSLProtocol|SSLCipherSuite|SSLCertificateChainFile|SSLCACertificateFile|SSLVerifyClient|SSLVerifyDepth|SSLOptions|SSLRequireSSL|SSLProxyEngine|SSLProxyProtocol|SSLProxyCipherSuite|SSLProxyCertificateFile|SSLProxyCertificateKeyFile|SSLProxyCACertificateFile|SSLProxyVerify|SSLProxyVerifyDepth|SSLProxyCheckPeerCN|SSLProxyCheckPeerName|SSLProxyCheckPeerExpire|SSLProxyMachineCertificateFile|SSLProxyMachineCertificatePath|SSLProxyCACertificatePath|SSLProxyCARevocationFile|SSLProxyCARevocationPath|SSLProxyProtocol|SSLProxyCipherSuite|ProxyRequests|ProxyVia|ProxyPreserveHost|ProxyPassReverseCookieDomain|ProxyPassReverseCookiePath|ProxyBlock|ProxyReceiveBufferSize|ProxyIOBufferSize|ProxyTimeout|ProxyBadHeader|ProxyErrorOverride|ProxyStatus|ProxyAddHeaders|ProxySet|ProxySourceAddress|ProxyFtpDirCharset|ProxyFtpEscapeWildcards|ProxyFtpListOnWildcard|ProxyFtpEscapeWildcards|ProxyFtpListOnWildcard|ProxyFtpEscapeWildcards|ProxyFtpListOnWildcard|BalancerMember|BalancerGrowth|BalancerPersist|BalancerInherit|BalancerMember|BalancerGrowth|BalancerPersist|BalancerInherit|SetEnvIf|SetEnvIfNoCase|UnsetEnv|PassEnv|SetHandler|AddHandler|RemoveHandler|SetOutputFilter|AddOutputFilterByType|RemoveOutputFilter|DeflateBufferSize|DeflateCompressionLevel|DeflateFilterNote|DeflateInflateLimitRequestBody|DeflateInflateRatioLimit|DeflateInflateRatioBurst|DeflateMemLevel|DeflateWindowSize|DeflateMethod|DeflateCompressionLevel|DeflateWindowSize|DeflateBufferSize|DeflateMemLevel|DeflateFilterNote|DeflateInflateLimitRequestBody|DeflateInflateRatioLimit|DeflateInflateRatioBurst|DeflateMethod)(?=\s|$)/ }
+  ];
+})();

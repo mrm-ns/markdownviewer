@@ -16,7 +16,7 @@
   
 
   <!-- 应用自身布局样式 -->
-  <link rel="stylesheet" href="css/style.css?v=6.9">
+  <link rel="stylesheet" href="css/style.css?v=1.0.3">
 
   
   
@@ -29,35 +29,64 @@
       <div class="toolbar-left">
         <strong class="brand"><img src="hutao.ico" class="app-icon" alt=""> Markdown Viewer</strong>
         <button id="btn-open-file" class="btn" title="打开单个 Markdown 文件">打开文件</button>
+
+
         <button id="btn-open-folder" class="btn" title="打开文件夹，浏览其中的 Markdown 文档">打开文件夹</button>
           <button id="btn-restore-default" class="btn" title="打开上次保存的默认目录">默认目录</button>
 
         <button id="btn-theme" class="btn" title="自定义代码块配色">🎨 主题</button>
-          <button id="btn-save-theme" class="btn" title="将当前编辑的主题保存到预设主题">💾 保存主题</button>
+          <button id="btn-undo-edit" class="btn" title="撤销上一条改动">↩︎ 撤销改动</button>
 
-        <button id="btn-export" class="btn" title="导出当前主题 JSON">导出主题</button>
-        <button id="btn-import" class="btn" title="导入主题 JSON">导入主题</button>
+
+
+
+
+        
+        
         <input type="file" id="file-input" accept=".md,.markdown,.mdown,.mkd,.txt,text/markdown" hidden>
         <input type="file" id="folder-input" webkitdirectory hidden>
         <input type="file" id="theme-input" accept=".json,application/json" hidden>
       </div>
       <div class="toolbar-right">
+          <select id="search-mode" class="search-mode" title="搜索范围">
+            <option value="name">文件名</option>
+            <option value="content">全文</option>
+          </select>
+
         <input type="search" id="search-box" class="search-box" placeholder="过滤文件...">
+          <button id="btn-reload-file" class="btn" title="热重载当前文件">⟳</button>
+
+          <button id="toolbar-collapse-btn" class="btn" title="收起顶部菜单">▲</button>
+
       </div>
     </header>
+    <button id="toolbar-expand-handle" class="toolbar-expand-handle" title="展开顶部菜单" hidden>▼</button>
+
 
     <div class="layout">
       <aside class="sidebar" id="sidebar">
+        <div class="sidebar-tabs">
+          <button class="sidebar-tab active" data-sidebar-tab="files" type="button">📄 文档列表</button>
+          <button class="sidebar-tab" data-sidebar-tab="outline" type="button">📑 当前大纲</button>
+        </div>
         <div class="sidebar-header">
-          <span>文档列表</span>
+          <span id="sidebar-title">文档列表</span>
           <span id="file-count" class="file-count"></span>
         </div>
-        <div id="file-tree" class="file-tree"></div>
-        <div id="empty-tip" class="empty-tip">
-          点击「打开文件夹」浏览 Markdown 文档，<br>
-          或「打开文件」查看单个文档。
+        <div id="files-panel" class="sidebar-panel">
+          <div id="file-tree" class="file-tree"></div>
+          <div id="empty-tip" class="empty-tip">
+            点击「打开文件夹」浏览 Markdown 文档，<br>
+            或「打开文件」查看单个文档。
+          </div>
+        </div>
+        <div id="outline-panel" class="sidebar-panel" hidden>
+          <div id="outline-tree" class="file-tree"></div>
         </div>
       </aside>
+
+        <button id="sidebar-toggle-handle" class="sidebar-toggle-handle" title="收起/展开侧边栏">◀</button>
+
 
       <main class="content">
         <div id="markdown-body" class="markdown-body"></div>
@@ -135,6 +164,11 @@
 
 
         <div class="drawer-actions">
+          <div class="drawer-actions">
+            <button id="btn-save-theme" class="btn">💾 保存主题</button>
+            <button id="btn-export" class="btn">导出主题</button>
+            <button id="btn-import" class="btn">导入主题</button>
+
           <button id="btn-reset-theme" class="btn">恢复预设</button>
           <button id="btn-copy-theme" class="btn">复制 JSON</button>
           <button id="btn-download-theme" class="btn btn-primary">下载主题 JSON</button>
@@ -147,8 +181,16 @@
   <!-- 文档列表右键菜单 -->
   <div id="context-menu" class="context-menu" hidden>
     <button id="ctx-rename" class="context-menu-item">✏️ 重命名</button>
+    <button id="ctx-remove" class="context-menu-item ctx-danger">🗑️ 从列表移除</button>
   </div>
 
-  <script src="app.js?v=6.9"></script>
+  <!-- 正文右键菜单 -->
+  <div id="content-context-menu" class="context-menu" hidden>
+    <button id="ctx-content-copy" class="context-menu-item">📋 复制</button>
+    <button id="ctx-content-edit" class="context-menu-item">✏️ 编辑</button>
+  </div>
+
+
+  <script src="app.js?v=1.0.3"></script>
 </body>
 </html>

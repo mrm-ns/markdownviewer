@@ -31,6 +31,7 @@ FILES = [
     'js/javascript.js',
     'js/json.js',
     'js/yaml.js',
+    'js/sql.js',
     'README.md',
     'ENVIRONMENT.md',
     'sample.md',
@@ -38,9 +39,11 @@ FILES = [
     'themes/keepalived.theme.json',
     'serve.py',
     'make_backup.py',
+    'add_language.py',
     'package_environment.py',
     'start.bat',
     'start.sh',
+]
 
 # 校验图标哈希，避免打包出去后因哈希不匹配导致无法启动
 ICON_PATH = os.path.join(BASE, 'hutao.ico')
@@ -69,8 +72,6 @@ if icon_hash.lower() != expected:
     sys.exit(1)
 
 print('图标哈希校验通过，开始打包...')
-
-]
 
 with zipfile.ZipFile(OUTPUT, 'w', zipfile.ZIP_DEFLATED) as zf:
     for name in FILES:

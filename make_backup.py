@@ -30,7 +30,9 @@ def get_current_version():
 
 
 VERSION = get_current_version()
-OUTPUT = os.path.join(BASE, f'markdown-viewer-v{VERSION}.zip')
+BACKUP_DIR = os.path.join(BASE, 'backup')
+os.makedirs(BACKUP_DIR, exist_ok=True)
+OUTPUT = os.path.join(BACKUP_DIR, f'markdown-viewer-v{VERSION}.zip')
 
 FILES = [
     'index.html',
@@ -47,6 +49,7 @@ FILES = [
     'js/javascript.js',
     'js/json.js',
     'js/yaml.js',
+    'js/sql.js',
     'README.md',
     'ENVIRONMENT.md',
     'sample.md',
@@ -54,6 +57,7 @@ FILES = [
     'themes/keepalived.theme.json',
     'serve.py',
     'make_backup.py',
+    'add_language.py',
     'start.bat',
     'start.sh',
     'package_environment.py',

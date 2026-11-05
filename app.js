@@ -21,7 +21,9 @@
     'js/python.js',
     'js/javascript.js',
     'js/json.js',
-    'js/yaml.js'
+    'js/yaml.js',
+    'js/text.js',
+    'js/sql.js'
   ];
 
   function showFatalError(message) {
@@ -44,12 +46,30 @@
     });
   }
 
+  function loadIconImage() {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () { resolve(true); };
+      img.onerror = function () { resolve(false); };
+      img.src = 'hutao.ico?t=' + Date.now();
+    });
+  }
+
   async function verifyIcon() {
-    if (EXPECTED_ICON_HASH === 'REPLACE_WITH_SHA256') {
+    if (EXPECTED_ICON_HASH === 'REPLACE_WITH_SHA256' || !EXPECTED_ICON_HASH) {
       showFatalError('图标哈希码未配置。\n请运行 python compute_icon_hash.py 获取 hutao.ico 的 SHA-256，并填写到 app.js 的 EXPECTED_ICON_HASH。');
       return false;
     }
 
+    // 第一层：用 <img> 验证图标文件是否存在且能正常加载
+    // 这种方式不依赖 fetch，适合 Apache / file:// 等环境
+    var imageOk = await loadIconImage();
+    if (!imageOk) {
+      showFatalError('无法加载主目录图标 hutao.ico，应用无法启动。\n请检查 hutao.ico 是否存在且权限正确。');
+      return false;
+    }
+
+    // 第二层：如果浏览器允许 fetch，再执行严格 SHA-256 校验
     try {
       var response = await fetch('hutao.ico', { cache: 'no-store' });
       if (!response.ok) throw new Error('HTTP ' + response.status);
@@ -62,17 +82,16 @@
       var hashHex = hashArray.map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
 
       if (hashHex.toLowerCase() !== EXPECTED_ICON_HASH.toLowerCase()) {
-        showFatalError('图标校验失败：当前 hutao.ico 不是预期的图标，应用无法启动。');
+        showFatalError(
+          '图标校验失败：当前 hutao.ico 不是预期的图标，应用无法启动。\n\n' +
+          '当前 hutao.ico SHA-256:\n' + hashHex + '\n\n' +
+          'app.js 中 EXPECTED_ICON_HASH:\n' + EXPECTED_ICON_HASH
+        );
         return false;
       }
     } catch (e) {
-      // file:// 或浏览器安全策略限制下无法 fetch 本地文件
-      if (window.location.protocol === 'file:') {
-        console.warn('[Markdown Viewer] file:// 模式下跳过图标哈希校验（浏览器限制无法读取本地文件）');
-        return true;
-      }
-      showFatalError('无法读取主目录图标 hutao.ico，应用无法启动。' + (e && e.message ? ' ' + e.message : ''));
-      return false;
+      // fetch 不可用时，已经通过 <img> 验证图标存在，这里放行
+      console.warn('[Markdown Viewer] 无法进行 SHA-256 校验，已通过图片加载验证图标存在。', e);
     }
 
     return true;
