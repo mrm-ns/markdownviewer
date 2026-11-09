@@ -201,12 +201,30 @@
         state.settings = {
           textSize: Number(parsed.textSize) || 16,
           codeSize: Number(parsed.codeSize) || 13.5,
-            inlineCodeSize: Number(parsed.inlineCodeSize) || 12
+            inlineCodeSize: Number(parsed.inlineCodeSize) || 12,
+          // 图片背景：默认开启白底。
+          // 只在显式存过 false 时才关闭（用 !== false 而不是 Boolean()，
+          // 这样老版本设置里没有这个字段时，升级后按默认「开启」处理）
+          imageBackground: parsed.imageBackground !== false,
+          imageBackgroundColor: normalizeCssColor(parsed.imageBackgroundColor) || '#ffffff'
         };
       }
     } catch (e) {
       // ignore
     }
+  }
+
+  // 校验颜色值，只接受 CSS 颜色字面量（#rgb / #rrggbb / #rrggbbaa / 具名色 / rgb() 等），
+  // 避免把任意字符串写进 CSS 变量造成样式注入或无效值
+  function normalizeCssColor(value) {
+    if (typeof value !== 'string') return '';
+    const v = value.trim();
+    if (!v || v.length > 32) return '';
+    if (/^#[0-9a-f]{3,8}$/i.test(v)) return v;
+    if (/^[a-z]+$/i.test(v)) return v;
+    if (/^rgba?\(\s*[\d.%,\s/]+\)$/i.test(v)) return v;
+    if (/^hsla?\(\s*[\d.%,\s/deg]+\)$/i.test(v)) return v;
+    return '';
   }
 
   function saveSettings() {
@@ -222,6 +240,12 @@
     root.style.setProperty('--md-text-size', state.settings.textSize + 'px');
     root.style.setProperty('--md-code-size', state.settings.codeSize + 'px');
     root.style.setProperty('--md-inline-code-size', state.settings.inlineCodeSize + 'px');
+    // 图片背景：用 CSS 变量驱动，样式表里统一用它给正文图片铺底
+    root.style.setProperty('--md-image-bg', state.settings.imageBackground
+      ? state.settings.imageBackgroundColor
+      : 'transparent');
+    // 铺底时给图片留出内边距，否则图片紧贴边缘、圆角看不出来
+    root.style.setProperty('--md-image-padding', state.settings.imageBackground ? '6px' : '0px');
   }
 
   function renderSettingsEditor() {
@@ -231,6 +255,10 @@
     if (textInput) textInput.value = state.settings.textSize;
     if (codeInput) codeInput.value = state.settings.codeSize;
     if (inlineCodeInput) inlineCodeInput.value = state.settings.inlineCodeSize;
+    const imageBgToggle = document.getElementById('image-background-toggle');
+    const imageBgColor = document.getElementById('image-background-color');
+    if (imageBgToggle) imageBgToggle.checked = !!state.settings.imageBackground;
+    if (imageBgColor) imageBgColor.value = state.settings.imageBackgroundColor || '#ffffff';
   }
 
 

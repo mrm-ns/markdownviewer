@@ -771,6 +771,47 @@ canDelete: canDeleteBlock,           // 是否允许删除（独立判据）
 （踩过：把 `addEventListener` 覆盖成空函数后绑定没被记录下来，
 看起来像「按钮没绑定」，实际是测试桩的 bug）。事件桩要真的把回调存进数组。
 
+### 6.15 图片背景：用 CSS 变量驱动，别写进图片标签
+
+**需求背景**：透明 PNG / SVG（截图、流程图、公式图）本身没有底板，
+暗色主题下与深色页面背景糊在一起，很难看清。
+
+**做法**：给 `.markdown-body img` 加 `background-color: var(--md-image-bg, transparent)`
+和 `padding: var(--md-image-padding, 0px)`，由 `applySettings()` 写这两个变量，
+设置项在「主题 → 阅读设置」（总开关 + 取色器）。
+
+**为什么用 CSS 变量而不是直接改 `<img>` 的 style**：
+
+| 方式 | 问题 |
+|---|---|
+| 在渲染时给每个 `<img>` 写内联 `style` 背景 | 用户改设置要**重新渲染整篇文档**才生效；导出、`restoreHtmlImages` 等多条管线都要各自补一遍，容易漏 |
+| 改成 `<img>` 外层包一个 `<div>` | 会破坏 Markdown 渲染结构（图片在段落/列表/表格里的位置都会变），还可能影响现有 CSS 选择器 |
+| **CSS 变量（当前做法）** | 改设置只写一个变量，浏览器自动重绘；所有已渲染的图片立即生效，无需重渲染 |
+
+**关键细节**：
+
+1. `box-sizing` 必须是 `content-box`（原本就是），背景画在 padding 区域，
+   **图片本身不会被拉伸变形**，只是多一圈底板；
+2. 变量要带兜底 `var(--md-image-bg, transparent)`：
+   即使 JS 没跑（如脚本报错），外观也与改动前完全一致，不会出错；
+3. 关闭时把变量设成 `transparent`、padding 设成 `0px`，
+   而不是去删 class —— 状态只有一处（变量），没有「css 类忘了摘」的中间态。
+
+**设置项要向后兼容**：老版本的 `localStorage` 里没有新字段，
+判断用 `parsed.imageBackground !== false` 而不是 `Boolean(parsed.imageBackground)`，
+否则老用户升级后会变成「默认关闭」，与需求相反。
+
+**颜色值必须校验**：`state.settings.imageBackgroundColor` 会被写进 CSS 变量，
+直接拼字符串等于开放样式注入（`red;}body{display:none` 之类）。
+`normalizeCssColor()` 只放行 `#rgb` / `#rrggbb` / `#rrggbbaa` / 具名色 / `rgb()` / `hsl()`，
+非法值回退 `#ffffff`。
+
+**顺带修掉的老问题**：`renderSettingsEditor()` 原先只在 `openDrawer()` 里调用，
+导致页面刚加载时抽屉控件显示 HTML 硬编码默认值、用户存过的值要等打开抽屉才被纠正。
+现在 `init()` 里 `loadSettings()` + `applySettings()` 之后补调一次。
+**教训**：凡是「读设置 → 回填控件」的函数，**初始化时必须调一次**，
+不能只挂在「打开面板」事件上。
+
 ## 7. 如何测试
 
 ### 本地运行

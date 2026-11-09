@@ -1116,6 +1116,13 @@ body.sidebar-collapsed .sidebar {
 .markdown-body img {
   max-width: 100%;
   box-sizing: content-box;
+  /* 图片背景：透明 PNG / SVG（截图、流程图、公式图）在暗色主题下没有底板会看不清，
+     所以默认铺一层白底（--md-image-bg，由「主题 → 阅读设置」控制，可改色或关闭）。
+     背景画在 padding 区域且 box-sizing 为 content-box，所以图片不会被拉伸变形；
+     关掉时 --md-image-bg 为 transparent、padding 为 0，外观与改动前完全一致。 */
+  background-color: var(--md-image-bg, transparent);
+  padding: var(--md-image-padding, 0px);
+  border-radius: 4px;
 }
 
 .markdown-body :not(pre) > code {

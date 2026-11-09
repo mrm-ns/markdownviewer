@@ -13,7 +13,15 @@
     searchReqSeq: 0,            // 全文搜索竞态序号
     searchTextCache: {},        // path -> { lastModified, size, text }，全文搜索文本缓存
     searchExpandedFiles: new Set(), // 全文搜索里已展开的文件路径（结果按文件分组折叠，默认全部收起）
-    settings: { textSize: 16, codeSize: 13.5, inlineCodeSize: 12 },
+    settings: {
+      textSize: 16,
+      codeSize: 13.5,
+      inlineCodeSize: 12,
+      // 图片背景：透明 PNG / SVG（截图、流程图、公式图）在暗色主题下没有底板会看不清，
+      // 默认给所有正文图片铺一层白底；用户可在「主题 → 阅读设置」里改色或关闭
+      imageBackground: true,
+      imageBackgroundColor: '#ffffff'
+    },
     imageMap: {},       // path -> objectURL，用于相对路径图片
     dirHandle: null,    // File System Access API 的当前目录句柄
     dirReadOnly: false, // 当前目录是否为只读模式（Apache/HTTP 快照模式时为 true）

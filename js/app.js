@@ -654,7 +654,15 @@
     searchReqSeq: 0,            // 全文搜索竞态序号
     searchTextCache: {},        // path -> { lastModified, size, text }，全文搜索文本缓存
     searchExpandedFiles: new Set(), // 全文搜索里已展开的文件路径（结果按文件分组折叠，默认全部收起）
-    settings: { textSize: 16, codeSize: 13.5, inlineCodeSize: 12 },
+    settings: {
+      textSize: 16,
+      codeSize: 13.5,
+      inlineCodeSize: 12,
+      // 图片背景：透明 PNG / SVG（截图、流程图、公式图）在暗色主题下没有底板会看不清，
+      // 默认给所有正文图片铺一层白底；用户可在「主题 → 阅读设置」里改色或关闭
+      imageBackground: true,
+      imageBackgroundColor: '#ffffff'
+    },
     imageMap: {},       // path -> objectURL，用于相对路径图片
     dirHandle: null,    // File System Access API 的当前目录句柄
     dirReadOnly: false, // 当前目录是否为只读模式（Apache/HTTP 快照模式时为 true）
@@ -1424,7 +1432,7 @@
       '.markdown-body table th { font-weight: 600; background: var(--inline-code-bg); }',
       '.markdown-body table tr:nth-child(2n) { background: var(--inline-code-bg); }',
       '.markdown-body hr { height: 2px; margin: 24px 0; background: var(--toolbar-border); border: none; }',
-      '.markdown-body img { max-width: 100%; height: auto; border-radius: 4px; }',
+      '.markdown-body img { max-width: 100%; height: auto; border-radius: 4px; background-color: ' + (state.settings.imageBackground ? state.settings.imageBackgroundColor : 'transparent') + '; padding: ' + (state.settings.imageBackground ? '6px' : '0px') + '; box-sizing: content-box; }',
       '.markdown-body :not(pre) > code { background: var(--md-inlineCodeBackground); color: var(--md-codeText); padding: 2px 6px; border-radius: 4px; font-size: ' + state.settings.inlineCodeSize + 'px; }',
       '.markdown-body pre { background: var(--md-codeBackground); color: var(--md-codeText); padding: 16px; border-radius: 6px; overflow-x: auto; margin-bottom: 16px; font-size: ' + state.settings.codeSize + 'px; line-height: 1.45; }',
       '.markdown-body pre code { background: transparent; padding: 0; font-size: inherit; color: inherit; }'
@@ -4960,12 +4968,30 @@
         state.settings = {
           textSize: Number(parsed.textSize) || 16,
           codeSize: Number(parsed.codeSize) || 13.5,
-            inlineCodeSize: Number(parsed.inlineCodeSize) || 12
+            inlineCodeSize: Number(parsed.inlineCodeSize) || 12,
+          // 图片背景：默认开启白底。
+          // 只在显式存过 false 时才关闭（用 !== false 而不是 Boolean()，
+          // 这样老版本设置里没有这个字段时，升级后按默认「开启」处理）
+          imageBackground: parsed.imageBackground !== false,
+          imageBackgroundColor: normalizeCssColor(parsed.imageBackgroundColor) || '#ffffff'
         };
       }
     } catch (e) {
       // ignore
     }
+  }
+
+  // 校验颜色值，只接受 CSS 颜色字面量（#rgb / #rrggbb / #rrggbbaa / 具名色 / rgb() 等），
+  // 避免把任意字符串写进 CSS 变量造成样式注入或无效值
+  function normalizeCssColor(value) {
+    if (typeof value !== 'string') return '';
+    const v = value.trim();
+    if (!v || v.length > 32) return '';
+    if (/^#[0-9a-f]{3,8}$/i.test(v)) return v;
+    if (/^[a-z]+$/i.test(v)) return v;
+    if (/^rgba?\(\s*[\d.%,\s/]+\)$/i.test(v)) return v;
+    if (/^hsla?\(\s*[\d.%,\s/deg]+\)$/i.test(v)) return v;
+    return '';
   }
 
   function saveSettings() {
@@ -4981,6 +5007,12 @@
     root.style.setProperty('--md-text-size', state.settings.textSize + 'px');
     root.style.setProperty('--md-code-size', state.settings.codeSize + 'px');
     root.style.setProperty('--md-inline-code-size', state.settings.inlineCodeSize + 'px');
+    // 图片背景：用 CSS 变量驱动，样式表里统一用它给正文图片铺底
+    root.style.setProperty('--md-image-bg', state.settings.imageBackground
+      ? state.settings.imageBackgroundColor
+      : 'transparent');
+    // 铺底时给图片留出内边距，否则图片紧贴边缘、圆角看不出来
+    root.style.setProperty('--md-image-padding', state.settings.imageBackground ? '6px' : '0px');
   }
 
   function renderSettingsEditor() {
@@ -4990,6 +5022,10 @@
     if (textInput) textInput.value = state.settings.textSize;
     if (codeInput) codeInput.value = state.settings.codeSize;
     if (inlineCodeInput) inlineCodeInput.value = state.settings.inlineCodeSize;
+    const imageBgToggle = document.getElementById('image-background-toggle');
+    const imageBgColor = document.getElementById('image-background-color');
+    if (imageBgToggle) imageBgToggle.checked = !!state.settings.imageBackground;
+    if (imageBgColor) imageBgColor.value = state.settings.imageBackgroundColor || '#ffffff';
   }
 
 
@@ -5850,7 +5886,24 @@
           });
         }
 
-
+      // 图片背景：开关 + 颜色（暗色主题下透明图片没有背景会看不清，默认开启白底）
+      const imageBgToggle = document.getElementById('image-background-toggle');
+      if (imageBgToggle) {
+        imageBgToggle.addEventListener('change', function () {
+          state.settings.imageBackground = this.checked;
+          applySettings();
+          saveSettings();
+        });
+      }
+      const imageBgColor = document.getElementById('image-background-color');
+      if (imageBgColor) {
+        // input 事件在拖动取色盘时连续触发，正好用于实时预览
+        imageBgColor.addEventListener('input', function () {
+          state.settings.imageBackgroundColor = this.value;
+          applySettings();
+          saveSettings();
+        });
+      }
 
   }
 
@@ -6933,11 +6986,16 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.0)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.01)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
     applySettings();
+    // 把已保存的设置回填到抽屉里的输入框。
+    // 原先只在 openDrawer() 里调用 renderSettingsEditor()，导致首次打开页面的
+    // 那一刻控件显示的是 HTML 里的默认值而不是用户存过的值（打开抽屉时才纠正）。
+    // 这里在绑定事件前先同步一次，保证控件与真实设置一致。
+    renderSettingsEditor();
     loadUserThemes();
     renderThemePresets();
     loadPdfColors();

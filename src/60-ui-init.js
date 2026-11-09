@@ -535,7 +535,24 @@
           });
         }
 
-
+      // 图片背景：开关 + 颜色（暗色主题下透明图片没有背景会看不清，默认开启白底）
+      const imageBgToggle = document.getElementById('image-background-toggle');
+      if (imageBgToggle) {
+        imageBgToggle.addEventListener('change', function () {
+          state.settings.imageBackground = this.checked;
+          applySettings();
+          saveSettings();
+        });
+      }
+      const imageBgColor = document.getElementById('image-background-color');
+      if (imageBgColor) {
+        // input 事件在拖动取色盘时连续触发，正好用于实时预览
+        imageBgColor.addEventListener('input', function () {
+          state.settings.imageBackgroundColor = this.value;
+          applySettings();
+          saveSettings();
+        });
+      }
 
   }
 
@@ -1618,11 +1635,16 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.0)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.01)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
     applySettings();
+    // 把已保存的设置回填到抽屉里的输入框。
+    // 原先只在 openDrawer() 里调用 renderSettingsEditor()，导致首次打开页面的
+    // 那一刻控件显示的是 HTML 里的默认值而不是用户存过的值（打开抽屉时才纠正）。
+    // 这里在绑定事件前先同步一次，保证控件与真实设置一致。
+    renderSettingsEditor();
     loadUserThemes();
     renderThemePresets();
     loadPdfColors();

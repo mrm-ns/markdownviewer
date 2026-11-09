@@ -252,7 +252,7 @@
       '.markdown-body table th { font-weight: 600; background: var(--inline-code-bg); }',
       '.markdown-body table tr:nth-child(2n) { background: var(--inline-code-bg); }',
       '.markdown-body hr { height: 2px; margin: 24px 0; background: var(--toolbar-border); border: none; }',
-      '.markdown-body img { max-width: 100%; height: auto; border-radius: 4px; }',
+      '.markdown-body img { max-width: 100%; height: auto; border-radius: 4px; background-color: ' + (state.settings.imageBackground ? state.settings.imageBackgroundColor : 'transparent') + '; padding: ' + (state.settings.imageBackground ? '6px' : '0px') + '; box-sizing: content-box; }',
       '.markdown-body :not(pre) > code { background: var(--md-inlineCodeBackground); color: var(--md-codeText); padding: 2px 6px; border-radius: 4px; font-size: ' + state.settings.inlineCodeSize + 'px; }',
       '.markdown-body pre { background: var(--md-codeBackground); color: var(--md-codeText); padding: 16px; border-radius: 6px; overflow-x: auto; margin-bottom: 16px; font-size: ' + state.settings.codeSize + 'px; line-height: 1.45; }',
       '.markdown-body pre code { background: transparent; padding: 0; font-size: inherit; color: inherit; }'

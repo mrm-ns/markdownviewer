@@ -243,6 +243,15 @@ function cmdCheckAll() {
     /^\s{2}\} else \{$/,
     /^\s{4}init\(\);$/,
     /^\s{2}\}$/,          // 上面那个 else 块的收尾大括号
+    // v1.1.01 图片背景（新增功能，替换了 3 行原样）：
+    //   - state.settings 拆成多行以加入 imageBackground / imageBackgroundColor
+    //   - 导出 HTML 的 img 规则加上背景色与内边距
+    //     （基线里有两行内容相同：导出 HTML 与 PDF CSS 各一处；
+    //      只改了导出 HTML 那处，PDF 那处保持原样 —— 白底页面无需处理）
+    //   - loadSettings 里补 inlineCodeSize 后的逗号（为追加新字段）
+    /^\s{4}settings: \{ textSize: 16, codeSize: 13\.5, inlineCodeSize: 12 \},$/,
+    /^\s{6}'\.markdown-body img \{ max-width: 100%; height: auto; border-radius: 4px; \}',$/,
+    /^\s{12}inlineCodeSize: Number\(parsed\.inlineCodeSize\) \|\| 12$/,
   ];
   // 整函数重写的白名单：当一次修改是「整段重写」某个函数而不是改几行时，
   // 逐行白名单会膨胀到几十条、失去审计意义。这里按「函数体范围」放行：
