@@ -22,6 +22,11 @@
     'js/javascript.js',
     'js/json.js',
     'js/yaml.js',
+  'js/nginx.js',
+  'js/xml.js',
+  'js/dockerfile.js',
+  'js/promql.js',
+	'js/apache.js',
     'js/text.js',
     'js/sql.js'
   ];
@@ -70,6 +75,10 @@
     }
 
     // 第二层：如果浏览器允许 fetch，再执行严格 SHA-256 校验
+    // file:// 协议下浏览器禁止 fetch（CORS 拦截），且 <img> 已验证图标存在，直接跳过
+    if (window.location.protocol === 'file:') {
+      return true;
+    }
     try {
       var response = await fetch('hutao.ico', { cache: 'no-store' });
       if (!response.ok) throw new Error('HTTP ' + response.status);

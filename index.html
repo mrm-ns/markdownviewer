@@ -16,7 +16,7 @@
   
 
   <!-- 应用自身布局样式 -->
-  <link rel="stylesheet" href="css/style.css?v=1.0.3">
+  <link rel="stylesheet" href="css/style.css?v=1.1.0">
 
   
   
@@ -31,11 +31,31 @@
         <button id="btn-open-file" class="btn" title="打开单个 Markdown 文件">打开文件</button>
 
 
-        <button id="btn-open-folder" class="btn" title="打开文件夹，浏览其中的 Markdown 文档">打开文件夹</button>
-          <button id="btn-restore-default" class="btn" title="打开上次保存的默认目录">默认目录</button>
+        <button id="btn-open-folder" class="btn" title="打开文件夹，浏览其中的 Markdown 文档与代码文件">打开文件夹</button>
+        <div class="tool-dropdown" id="default-dir-dropdown">
+          <button id="btn-default-dir-menu" class="btn" title="默认目录：打开上次保存的默认目录，或把当前文件夹设为默认目录">默认目录 ▾</button>
+          <div class="tool-dropdown-menu" id="default-dir-menu" hidden>
+            <button class="tool-dropdown-item" id="btn-open-default-dir">📂 打开默认目录</button>
+            <button class="tool-dropdown-item" id="btn-set-default-dir">📌 设定默认目录</button>
+          </div>
+        </div>
 
         <button id="btn-theme" class="btn" title="自定义代码块配色">🎨 主题</button>
+          <span class="toolbar-color-wrap" title="先选中正文文字（代码块除外），再点「文本上色」应用当前颜色，或点「取消颜色」恢复普通正文">
+            <button id="btn-apply-text-color" class="btn" title="把当前颜色应用到选中的正文文字（代码块除外）">
+              🎨 文本上色
+              <input type="color" id="text-color-picker" class="text-color-picker" value="#e02a2a" title="RGB 色盘：点击修改当前文字颜色">
+            </button>
+            <button id="btn-clear-text-color" class="btn" title="取消选中文字的颜色，恢复为普通正文（代码块除外）">🚫 取消颜色</button>
+          </span>
           <button id="btn-undo-edit" class="btn" title="撤销上一条改动">↩︎ 撤销改动</button>
+          <div class="export-dropdown" id="export-dropdown">
+            <button id="btn-export-menu" class="btn" title="导出当前文档">📤 导出 ▾</button>
+            <div class="export-dropdown-menu" id="export-dropdown-menu" hidden>
+              <button class="export-dropdown-item" id="btn-export-html">📄 导出 HTML</button>
+              <button class="export-dropdown-item" id="btn-export-pdf">📑 导出 PDF</button>
+            </div>
+          </div>
 
 
 
@@ -43,17 +63,11 @@
 
         
         
-        <input type="file" id="file-input" accept=".md,.markdown,.mdown,.mkd,.txt,text/markdown" hidden>
+        <input type="file" id="file-input" accept=".md,.markdown,.mdown,.mkd,.txt,.bash,.sh,.zsh,.ksh,.py,.js,.json,.yaml,.yml,.ini,.conf,.sql,.promql,text/markdown,text/plain" hidden>
         <input type="file" id="folder-input" webkitdirectory hidden>
         <input type="file" id="theme-input" accept=".json,application/json" hidden>
       </div>
       <div class="toolbar-right">
-          <select id="search-mode" class="search-mode" title="搜索范围">
-            <option value="name">文件名</option>
-            <option value="content">全文</option>
-          </select>
-
-        <input type="search" id="search-box" class="search-box" placeholder="过滤文件...">
           <button id="btn-reload-file" class="btn" title="热重载当前文件">⟳</button>
 
           <button id="toolbar-collapse-btn" class="btn" title="收起顶部菜单">▲</button>
@@ -65,18 +79,30 @@
 
     <div class="layout">
       <aside class="sidebar" id="sidebar">
+        <div class="sidebar-search">
+          <select id="search-mode" class="search-mode" title="搜索范围">
+            <option value="name">文件名</option>
+            <option value="content">全文（含标题）</option>
+          </select>
+          <input type="search" id="search-box" class="search-box" placeholder="过滤文件...">
+        </div>
         <div class="sidebar-tabs">
           <button class="sidebar-tab active" data-sidebar-tab="files" type="button">📄 文档列表</button>
           <button class="sidebar-tab" data-sidebar-tab="outline" type="button">📑 当前大纲</button>
         </div>
         <div class="sidebar-header">
           <span id="sidebar-title">文档列表</span>
-          <span id="file-count" class="file-count"></span>
+          <span class="sidebar-header-right">
+            <span id="file-count" class="file-count"></span>
+            <button id="btn-reload-dir" class="sidebar-icon-btn" type="button"
+                    title="重载当前目录：重新读取目录内容，刷新左侧文件列表（保留当前打开的文档与滚动位置）">⟳</button>
+          </span>
         </div>
         <div id="files-panel" class="sidebar-panel">
           <div id="file-tree" class="file-tree"></div>
+          <div id="search-results" class="search-results" hidden></div>
           <div id="empty-tip" class="empty-tip">
-            点击「打开文件夹」浏览 Markdown 文档，<br>
+            点击「打开文件夹」浏览 Markdown 文档与代码文件，<br>
             或「打开文件」查看单个文档。
           </div>
         </div>
@@ -94,10 +120,13 @@
           <h1>欢迎使用 Markdown Viewer</h1>
           <p>这是一个 GitHub 风格的 Markdown 文档浏览器，支持：</p>
           <ul>
-            <li>打开 / 拖入 <code>.md</code> 文件或整个文件夹</li>
-            <li>GFM 基础渲染：标题、列表、表格、引用、任务列表等</li>
-            <li>代码块语法高亮，并支持高度自定义配色</li>
-            <li>主题导入 / 导出，设置自动保存在本地浏览器</li>
+            <li>打开 / 拖入 <code>.md</code> 文件或整个文件夹；「默认目录 ▾」可打开或设定默认目录</li>
+            <li>也支持代码 / 配置文件：<code>.txt</code>（纯文本）、<code>.py</code>、<code>.sh</code> / <code>.bash</code>、<code>.js</code>、<code>.json</code>、<code>.yaml</code>、<code>.ini</code>、<code>.conf</code>、<code>.sql</code>、<code>Dockerfile</code> 等，按对应语法高亮显示</li>
+            <li>GFM 渲染：标题、列表、表格、引用、任务列表，支持 <code>&lt;br&gt;</code> 换行与 <code>&lt;font color&gt;</code> 文字颜色</li>
+            <li>代码块语法高亮，主题配色高度可定制（导入 / 导出、正文字号设置）</li>
+            <li>右键编辑正文 / 代码块，修改可直接写回磁盘（兼容模式则保存到浏览器缓存）</li>
+            <li>选中文字上色 / 取消颜色，单击图片可在浏览器中放大查看</li>
+            <li>全文搜索、文档内跳转、撤销改动、热重载</li>
           </ul>
         </div>
       </main>
@@ -109,31 +138,38 @@
     <div class="drawer-mask" id="drawer-mask"></div>
     <div class="drawer-panel">
       <div class="drawer-header">
-        <h2>🎨 代码块配色定制</h2>
+        <h2>🎨 主题配色定制</h2>
         <button id="btn-close-theme" class="btn-icon" aria-label="关闭">✕</button>
       </div>
 
       <div class="drawer-body">
-        <div class="form-row">
-          <label for="theme-preset">预设主题</label>
-          <select id="theme-preset">
-            <option value="github-light">GitHub Light</option>
-            <option value="github-dark">GitHub Dark</option>
-            <option value="atom-one-dark">Atom One Dark</option>
-            <option value="dracula">Dracula</option>
-            <option value="solarized-light">Solarized Light</option>
-              <option value="keepalived">Keepalived Config</option>
-
-            <option value="custom">自定义</option>
-          </select>
+        <!-- 主题编辑器模式切换 -->
+        <div class="theme-mode-switch">
+          <button type="button" id="theme-mode-code" class="theme-mode-btn active">代码块配色</button>
+          <button type="button" id="theme-mode-pdf" class="theme-mode-btn">导出PDF配色</button>
         </div>
 
-        <div class="form-row">
-          <label class="switch-label">
-            <input type="checkbox" id="theme-dark-toggle">
-            <span>使用深色文档背景</span>
-          </label>
-        </div>
+        <!-- 代码块配色面板 -->
+        <div id="code-theme-panel">
+          <div class="form-row">
+            <label for="theme-preset">预设主题</label>
+            <select id="theme-preset">
+              <option value="github-light">GitHub Light</option>
+              <option value="github-dark">GitHub Dark</option>
+              <option value="atom-one-dark">Atom One Dark</option>
+              <option value="dracula">Dracula</option>
+              <option value="solarized-light">Solarized Light</option>
+                <option value="keepalived">Keepalived Config</option>
+              <option value="custom">自定义</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <label class="switch-label">
+              <input type="checkbox" id="theme-dark-toggle">
+              <span>使用深色文档背景</span>
+            </label>
+          </div>
 
           <div class="form-row">
             <label for="text-size">正文字号（px）</label>
@@ -145,36 +181,89 @@
             <input type="number" id="code-size" min="10" max="40" step="0.5" value="13.5">
           </div>
 
-            <div class="form-row">
-              <label for="inline-code-size">行内代码字号（px）</label>
-              <input type="number" id="inline-code-size" min="10" max="40" step="0.5" value="12">
-            </div>
+          <div class="form-row">
+            <label for="inline-code-size">行内代码字号（px）</label>
+            <input type="number" id="inline-code-size" min="10" max="40" step="0.5" value="12">
+          </div>
 
-
-
-        <div class="form-row">
-          <label>代码块配色</label>
-          <div id="color-editor" class="color-editor"></div>
-        </div>
+          <div class="form-row">
+            <span class="form-row-label">代码块配色</span>
+            <div id="color-editor" class="color-editor"></div>
+          </div>
 
           <div class="form-row">
             <label for="custom-css">高级 CSS（可选，可针对具体语言覆盖）</label>
             <textarea id="custom-css" rows="5" placeholder="例如：&#10;.markdown-body .language-python .hljs-keyword { color: #ff0000; }&#10;.markdown-body .language-js .hljs-string { color: #00aa00; }"></textarea>
           </div>
 
-
-        <div class="drawer-actions">
           <div class="drawer-actions">
-            <button id="btn-save-theme" class="btn">💾 保存主题</button>
-            <button id="btn-export" class="btn">导出主题</button>
-            <button id="btn-import" class="btn">导入主题</button>
+            <div class="drawer-actions">
+              <button id="btn-save-theme" class="btn">💾 保存主题</button>
+              <button id="btn-export" class="btn">导出主题</button>
+              <button id="btn-import" class="btn">导入主题</button>
+              <button id="btn-reset-theme" class="btn">恢复预设</button>
+              <button id="btn-copy-theme" class="btn">复制 JSON</button>
+              <button id="btn-download-theme" class="btn btn-primary">下载主题 JSON</button>
+            </div>
+          </div>
+        </div>
 
-          <button id="btn-reset-theme" class="btn">恢复预设</button>
-          <button id="btn-copy-theme" class="btn">复制 JSON</button>
-          <button id="btn-download-theme" class="btn btn-primary">下载主题 JSON</button>
+        <!-- 导出PDF配色面板 -->
+        <div id="pdf-theme-panel" hidden>
+          <div class="form-row">
+            <span class="form-row-label">导出版式（字号 / 行高 / 纸张 / 字体）</span>
+            <div id="pdf-layout-editor" class="layout-editor"></div>
+            <div class="pdf-preview-hint">与阅读器字号相互独立，只影响导出的 PDF。页边距与真实分页请在「真实 PDF 预览」里查看。</div>
+          </div>
+
+          <div class="form-row">
+            <span class="form-row-label">样式预览（与导出同一份样式，实时刷新）</span>
+            <div class="pdf-preview-wrap">
+              <iframe id="pdf-preview-frame" title="PDF 样式预览" sandbox="allow-same-origin"></iframe>
+            </div>
+            <div class="pdf-preview-hint">打开文档后这里显示该文档；未打开文档时显示内置示例。</div>
+            <div class="drawer-actions">
+              <button id="btn-pdf-preview-real" class="btn btn-primary">📄 真实 PDF 预览</button>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <span class="form-row-label">导出PDF配色</span>
+            <div id="pdf-color-editor" class="color-editor"></div>
+          </div>
+          <div class="drawer-actions">
+            <button id="btn-export-pdf-colors" class="btn">导出 PDF 主题</button>
+            <button id="btn-import-pdf-colors" class="btn">导入 PDF 主题</button>
+            <button id="btn-reset-pdf-colors" class="btn">恢复 PDF 默认主题</button>
+          </div>
+          <input type="file" id="pdf-colors-input" accept=".json,application/json" hidden>
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- 真实 PDF 预览弹层（iframe 内嵌 prince 生成的 PDF；此 iframe 不加 sandbox，
+       Chrome 内置 PDF 查看器在 sandbox 帧里会被禁掉） -->
+  <div id="pdf-preview-modal" class="pdf-modal" hidden>
+    <div class="pdf-modal-dialog">
+      <div class="pdf-modal-header">
+        <h2>真实 PDF 预览</h2>
+        <div class="pdf-modal-actions">
+          <span id="pdf-preview-status" class="pdf-modal-status"></span>
+          <button id="btn-pdf-preview-regen" class="btn">⟳ 重新生成</button>
+          <button id="btn-pdf-preview-close" class="btn-icon" aria-label="关闭">✕</button>
+        </div>
+      </div>
+      <iframe id="pdf-preview-frame-lg" class="pdf-modal-frame" title="真实 PDF 预览"></iframe>
+    </div>
+  </div>
+
+
+  <!-- 图片放大预览弹层（页面内查看，不再新开标签页。
+       file:// 下也能用：浏览器只禁止「顶层导航」到本地文件，不禁止页面内 <img> 加载本地图片） -->
+  <div id="image-lightbox" class="image-lightbox" hidden>
+    <button id="image-lightbox-close" class="image-lightbox-close" aria-label="关闭">✕</button>
+    <img id="image-lightbox-img" class="image-lightbox-img" alt="">
   </div>
 
 
@@ -191,6 +280,6 @@
   </div>
 
 
-  <script src="app.js?v=1.0.3"></script>
+  <script src="app.js?v=1.1.0"></script>
 </body>
 </html>

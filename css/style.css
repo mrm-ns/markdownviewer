@@ -17,6 +17,7 @@
   --drawer-border: #d0d7de;
   --shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
   --muted: #656d76;
+  --search-hit-bg: #fff3bf;
 }
 
 [data-app-theme="dark"] {
@@ -38,6 +39,7 @@
   --drawer-border: #30363d;
   --shadow: 0 8px 24px rgba(1, 4, 9, 0.6);
   --muted: #8b949e;
+  --search-hit-bg: #5b4a1f;
 }
 
 * {
@@ -142,6 +144,39 @@ body.toolbar-collapsed .toolbar {
   background: var(--btn-hover);
 }
 
+/* 顶部工具栏：文本上色（按钮内嵌色块） */
+.toolbar-color-wrap {
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.text-color-picker {
+  width: 26px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.text-color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.text-color-picker::-webkit-color-swatch {
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+}
+
+.text-color-picker::-moz-color-swatch {
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+}
+
 .btn-primary {
   background: #1f883d;
   border-color: #1f883d;
@@ -195,6 +230,209 @@ body.toolbar-collapsed .toolbar {
   border: 1px solid var(--input-border);
   border-radius: 6px;
   outline: none;
+}
+
+/* ===== 侧边栏搜索区（搜索框迁移到侧边栏顶端） ===== */
+.sidebar-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
+}
+
+.sidebar-search .search-box {
+  width: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-search .search-mode {
+  flex-shrink: 0;
+  width: 76px;
+}
+
+/* ===== 全文搜索行级结果 ===== */
+.search-results {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 6px;
+}
+
+.search-results[hidden] {
+  display: none;
+}
+
+/* ===== 按文件分组的组标题（可折叠） ===== */
+.search-group {
+  margin-bottom: 6px;
+}
+
+.search-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-fg);
+}
+
+.search-group-header:hover {
+  background: var(--sidebar-hover);
+  border-color: var(--sidebar-border);
+}
+
+.search-group-name {
+  flex-shrink: 0;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 文件名右侧的小三角：▸ 收起 / ▾ 展开 */
+.search-group-arrow {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+/* 目录前缀：弱化显示，用于区分不同目录下的同名文件 */
+.search-group-folder {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.search-group-count {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--sidebar-hover);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* 组内匹配行：左侧缩进 + 竖线，体现层级 */
+.search-group-items {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--sidebar-border);
+}
+
+.search-result {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.search-result:hover {
+  background: var(--sidebar-hover);
+  border-color: var(--sidebar-border);
+}
+
+.search-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.search-result-line {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--sidebar-hover);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* 标题命中的「标题 Hn」小标签：与正文命中的区分开 */
+.search-result-kind {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--active-fg);
+  background: var(--active-bg);
+  border-radius: 10px;
+  padding: 1px 6px;
+}
+
+/* 标题命中整行左侧加一条竖线，扫一眼就能看出哪条是标题 */
+.search-result.is-heading {
+  border-left: 3px solid var(--active-fg);
+  padding-left: 7px;
+}
+
+.search-result.is-heading .search-result-snippet {
+  color: var(--app-fg);
+  font-weight: 600;
+}
+
+.search-result-heading {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-snippet {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+mark.search-hit {
+  background: var(--search-hit-bg);
+  border-radius: 3px;
+  padding: 0 1px;
+  color: inherit;
+}
+
+.search-empty {
+  padding: 18px 10px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* 跳转高亮闪烁 */
+.jump-flash {
+  animation: jump-flash 1.8s ease-out;
+  border-radius: 6px;
+}
+
+@keyframes jump-flash {
+  from {
+    background-color: var(--search-hit-bg);
+  }
+  to {
+    background-color: transparent;
+  }
 }
 
 
@@ -322,6 +560,54 @@ body.sidebar-collapsed .sidebar {
   font-size: 11px;
 }
 
+/* 文档列表标题栏右侧：文件计数 + 「重载当前目录」按钮 */
+.sidebar-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sidebar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, transform 0.3s;
+}
+
+.sidebar-icon-btn:hover {
+  background: var(--sidebar-hover);
+  color: var(--app-fg);
+}
+
+.sidebar-icon-btn:active {
+  transform: scale(0.92);
+}
+
+/* 正在重载：图标旋转，给出「在忙」的反馈 */
+.sidebar-icon-btn.spinning {
+  animation: sidebar-icon-spin 0.6s linear infinite;
+}
+
+@keyframes sidebar-icon-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-icon-btn.spinning { animation: none; }
+  .sidebar-icon-btn:active { transform: none; }
+}
+
 .file-tree {
   flex: 1;
   overflow-y: auto;
@@ -395,6 +681,54 @@ body.sidebar-collapsed .sidebar {
   text-overflow: ellipsis;
 }
 
+/* ===== 导出下拉菜单 ===== */
+.export-dropdown,
+.tool-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.export-dropdown-menu,
+.tool-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 3000;
+  min-width: 160px;
+  padding: 4px;
+  margin-top: 4px;
+  background: var(--drawer-bg);
+  border: 1px solid var(--drawer-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.export-dropdown-menu[hidden],
+.tool-dropdown-menu[hidden] {
+  display: none;
+}
+
+.export-dropdown-item,
+.tool-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  font-size: 13px;
+  text-align: left;
+  color: var(--app-fg);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.export-dropdown-item:hover,
+.tool-dropdown-item:hover {
+  background: var(--sidebar-hover);
+}
+
+
 /* ===== 右键菜单 ===== */
 .context-menu {
   position: fixed;
@@ -405,6 +739,21 @@ body.sidebar-collapsed .sidebar {
   border: 1px solid var(--drawer-border);
   border-radius: 8px;
   box-shadow: var(--shadow);
+}
+
+/* 兜底：窗口太矮时主菜单高度随内容变化（菜单项数不同，最多约 200px），
+   允许滚动，避免下半部分（尤其是最底部的「删除」）被窗口下沿裁掉。
+   正常窗口下菜单远达不到这个高度，不会出现滚动条；
+   配合 JS 的 clampMenuIntoViewport 一起用（见 60-ui-init.js）。
+
+   注意：只加在「正文右键主菜单」上，不能用 .context-menu 通配 ——
+   .context-submenu（二级菜单）复用了 .context-menu 的类名，
+   而它是 position:absolute 向父级右侧展开的，给父级加 overflow 会把子菜单裁掉。
+   这里用 id 限定到主菜单节点上。 */
+#content-context-menu {
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .context-menu[hidden] {
@@ -434,6 +783,214 @@ body.sidebar-collapsed .sidebar {
 
 .context-menu-item.ctx-danger:hover {
   background: rgba(248, 81, 73, 0.12);
+}
+
+/* 不可用的菜单项（如「缩进」在置顶首项上的「右移」）。
+   用 disabled 属性而不是自己拦点击：禁用按钮不派发 click，点它天然没反应。
+   必须显式覆盖 :hover 背景，否则鼠标划过去仍会高亮，看起来像可点。 */
+.context-menu-item:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+.context-menu-item:disabled:hover {
+  background: transparent;
+}
+
+/* 插入项与「复制/编辑」之间的分隔线 */
+.context-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--drawer-border);
+}
+
+/* ===== 右键菜单的「插入」二级菜单 ===== */
+/* wrap 是定位参照（relative），子菜单相对它绝对定位展开到右侧 */
+.context-submenu-wrap {
+  position: relative;
+}
+
+/* 子菜单复用 .context-menu 的配色与圆角，但定位由这里接管，
+   所以必须覆盖 .context-menu 的 position:fixed —— 否则会相对视口定位，
+   跑到离菜单很远的地方（fixed 在祖先无 transform 时不受父级定位影响） */
+.context-submenu {
+  position: absolute;
+  top: -5px;              /* 让子菜单首项与触发项大致对齐（补掉父级 padding） */
+  left: 100%;
+  margin-left: 2px;
+  min-width: 168px;
+  display: none;
+  z-index: 1;
+}
+
+/* 展开态：hover 或点击触发项时加上 open */
+.context-submenu-wrap.open > .context-submenu {
+  display: block;
+}
+
+/* 触发项：文字靠左、小三角靠右 */
+.context-submenu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ctx-submenu-arrow {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--muted);
+  transition: transform 0.12s ease;
+}
+
+.context-submenu-wrap.open > .ctx-submenu-trigger {
+  background: var(--sidebar-hover);
+}
+
+.context-submenu-wrap.open > .ctx-submenu-trigger .ctx-submenu-arrow {
+  transform: rotate(90deg);
+}
+
+
+/* ===== 插入文本块 / 代码块 ===== */
+/* 插入位置预览线：hover 右键菜单里的插入项时显示，仅提示位置，不修改任何内容 */
+.insert-preview-line {
+  position: fixed;
+  display: none;
+  height: 3px;
+  margin-top: -1.5px;
+  background: #2f81f7;
+  border-radius: 2px;
+  box-shadow: 0 0 6px rgba(47, 129, 247, 0.7);
+  pointer-events: none;
+  z-index: 9998;
+}
+
+.insert-preview-line::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -3px;
+  width: 9px;
+  height: 9px;
+  background: #2f81f7;
+  border-radius: 50%;
+}
+
+/* 预览线文字标签：靠右显示，避免遮住正文左侧内容 */
+.insert-preview-label {
+  position: absolute;
+  right: 0;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: nowrap;
+  color: #fff;
+  background: #2f81f7;
+  border-radius: 4px;
+}
+
+/* 插入编辑框容器：就地出现在插入点，视觉上直接标明新内容将落在哪里 */
+.insert-wrapper {
+  margin: 8px 0;
+  padding: 8px 10px;
+  background: var(--input-bg);
+  border: 1px dashed #2f81f7;
+  border-radius: 8px;
+}
+
+.insert-label {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.insert-lang-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.insert-lang-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.insert-lang-input {
+  flex: 0 0 180px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--app-fg);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+}
+
+/* 关键：插入编辑框从「一行」起步并随内容增缩。
+   既有 .inline-editor 有 min-height:80px 的下限，这里必须显式覆盖为 0，
+   否则新建的空编辑框会先撑成 80px 高，看不出「一行起步」的效果。 */
+.insert-editor {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  padding: 8px 10px;
+  overflow: hidden; /* 高度已由 scrollHeight 精确控制，出现滚动条会吃掉一行高度 */
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--app-fg);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  resize: none;
+  outline: none;
+}
+
+.insert-editor:focus {
+  border-color: #2f81f7;
+}
+
+.insert-editor.insert-code {
+  font-family: var(--md-code-font, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: var(--md-code-size, 13.5px);
+}
+
+/* 插入时的「缩进一级」选项：整行可点（label 包住 checkbox + 文字）
+   不可用时置灰，并把原因写进 title，避免用户勾了却看不到任何效果 */
+.insert-indent-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.insert-indent-row.is-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.insert-indent-check {
+  flex-shrink: 0;
+  margin: 0;
+  cursor: inherit;
+}
+
+.insert-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.insert-footer .btn {
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 
@@ -503,6 +1060,13 @@ body.sidebar-collapsed .sidebar {
 .markdown-body li > input[type="checkbox"] {
   margin-right: 0.5em;
   vertical-align: middle;
+}
+
+/* 正文加粗（**文字** / <b>）：加粗 + 使用主题「加粗」颜色，让强调内容更醒目 */
+.markdown-body strong,
+.markdown-body b {
+  font-weight: bold;
+  color: var(--md-strong);
 }
 
 .markdown-body blockquote {
@@ -582,6 +1146,13 @@ body.sidebar-collapsed .sidebar {
   color: var(--app-fg);
 }
 
+.welcome ul {
+  display: inline-block;
+  text-align: left;
+  margin: 12px auto;
+  line-height: 1.9;
+}
+
 /* 代码块基础样式（会被主题编辑器生成的 CSS 进一步覆盖） */
 .markdown-body pre {
   position: relative;
@@ -623,11 +1194,23 @@ body.sidebar-collapsed .sidebar {
 }
 
 .inline-editor {
-  min-height: 80px;
+  /* 高度跟随内容：单行内容就是一行高（原来固定 80px 下限，单行段落也撑成一大块）。
+     由 JS 按 scrollHeight 设置高度，故关闭手动拖拽与滚动条：
+     拖拽出来的高度会在下一次输入时被覆盖，是死控件；滚动条会吃掉一行高度。 */
+  min-height: 0;
+  overflow: hidden;
+  resize: none;
 }
 
+/* 代码块编辑框：字号跟随代码块字号设置（--md-code-size），高度由 JS 动态控制 */
 .code-editor {
-  min-height: 200px;
+  min-height: 0;
+  padding: 16px;
+  font-size: var(--md-code-size, 13.5px);
+  line-height: 1.5;
+  /* 同上：高度由 JS 按 scrollHeight 控制，手动拖拽会被覆盖，滚动条会吃掉一行高度 */
+  overflow: hidden;
+  resize: none;
 }
 
 
@@ -701,10 +1284,37 @@ body.sidebar-collapsed .sidebar {
   margin-bottom: 18px;
 }
 
-.form-row label {
+.form-row label,
+.form-row .form-row-label {
   display: block;
   margin-bottom: 6px;
   font-size: 13px;
+  font-weight: 600;
+}
+
+/* 主题编辑器模式切换（代码块配色 / 导出PDF配色） */
+.theme-mode-switch {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.theme-mode-btn {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--app-fg);
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.theme-mode-btn.active {
+  background: var(--btn-hover);
+  border-color: var(--btn-border);
   font-weight: 600;
 }
 
@@ -759,6 +1369,16 @@ body.sidebar-collapsed .sidebar {
   border-radius: 6px;
 }
 
+/* 配色编辑器分区标题（如「代码块语法配色」） */
+.color-section {
+  margin: 10px 0 2px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--drawer-border);
+}
+
 .color-row .color-name {
   font-size: 13px;
   overflow: hidden;
@@ -793,6 +1413,195 @@ body.sidebar-collapsed .sidebar {
   margin-top: 8px;
 }
 
+/* ===== PDF 版式编辑器（字号 / 行高 / 纸张 / 字体） ===== */
+.layout-editor {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.layout-row {
+  display: grid;
+  grid-template-columns: 1fr 120px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid var(--drawer-border);
+  border-radius: 6px;
+}
+
+.layout-row .layout-name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layout-row input[type="number"],
+.layout-row select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  font-size: 12px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--app-fg);
+}
+
+/* ===== PDF 样式预览（抽屉内） ===== */
+.pdf-preview-wrap {
+  height: 260px;
+  border: 1px solid var(--drawer-border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.pdf-preview-wrap iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #ffffff;
+}
+
+.pdf-preview-hint {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ===== 真实 PDF 预览弹层 ===== */
+.pdf-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.pdf-modal[hidden] {
+  display: none;
+}
+
+.pdf-modal-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 92vw);
+  height: 86vh;
+  background: var(--drawer-bg);
+  border: 1px solid var(--drawer-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.pdf-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--drawer-border);
+  flex-shrink: 0;
+}
+
+.pdf-modal-header h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.pdf-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdf-modal-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pdf-modal-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #ffffff;
+}
+
+@media (max-width: 720px) {
+  .pdf-modal-dialog {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+  .pdf-modal-status {
+    display: none;
+  }
+}
+
+/* ===== 图片放大预览弹层 ===== */
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.82);
+  cursor: zoom-out;
+}
+
+.image-lightbox[hidden] {
+  display: none;
+}
+
+.image-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  cursor: default;
+}
+
+.image-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  line-height: 1;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.image-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+/* 放大期间锁背景滚动，避免滚轮穿透到正文 */
+body.lightbox-open {
+  overflow: hidden;
+}
+
+@media (max-width: 720px) {
+  .image-lightbox {
+    padding: 12px;
+  }
+  .image-lightbox-close {
+    top: 10px;
+    right: 10px;
+  }
+}
+
 .toast {
   position: fixed;
   bottom: 20px;
@@ -812,6 +1621,22 @@ body.sidebar-collapsed .sidebar {
 
 .toast.show {
   opacity: 1;
+}
+
+/* 图片加载失败（文件不存在 / 路径无效）提示样式 */
+.markdown-body img.image-load-error {
+  outline: 2px dashed var(--md-comment, #8b949e);
+  outline-offset: 2px;
+  opacity: 0.6;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+/* text 代码块 **强调**：加粗 + 颜色（颜色跟随主题「强调」项） */
+.markdown-body .language-text .hljs-strong,
+.markdown-body .language-txt .hljs-strong {
+  font-weight: bold;
+  color: var(--md-strong, #8250df);
 }
 
 /* ===== 响应式 ===== */

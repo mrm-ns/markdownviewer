@@ -1,0 +1,1858 @@
+[
+ {
+  "name": "<<HEADER>>",
+  "kind": "header",
+  "start": 1,
+  "end": 8,
+  "lines": 8,
+  "sha": "ed0269b086e6e580c28713732134cca97067e67878c70641a57c710c7ebba7db"
+ },
+ {
+  "name": "escapeHtml",
+  "kind": "function",
+  "start": 9,
+  "end": 15,
+  "lines": 7,
+  "sha": "8697d1abefa5dedade9505be691e5a2def82396b3f77b7532636f49164ba3840"
+ },
+ {
+  "name": "isMarkdownFile",
+  "kind": "function",
+  "start": 16,
+  "end": 20,
+  "lines": 5,
+  "sha": "d400fab44942e666529737b3485121cb5d1119ae084718bafcb10e9457193f28"
+ },
+ {
+  "name": "EXT_LANG_MAP",
+  "kind": "decl",
+  "start": 21,
+  "end": 37,
+  "lines": 17,
+  "sha": "16cb331a22e8fb8a457fedfcd774738456abcad4dbb00caa7afc1d0efa5f15c0"
+ },
+ {
+  "name": "FILENAME_LANG_MAP",
+  "kind": "decl",
+  "start": 38,
+  "end": 43,
+  "lines": 6,
+  "sha": "fdc9c935a0de3b5c786e68197112927a784e5cad7e1689c1b7c0ef77283fc54c"
+ },
+ {
+  "name": "baseName",
+  "kind": "function",
+  "start": 44,
+  "end": 48,
+  "lines": 5,
+  "sha": "a1a44eb20da87815e194ec49c55ff26d5ed708f84e91fd96256bf2d38a171c11"
+ },
+ {
+  "name": "getFileLang",
+  "kind": "function",
+  "start": 49,
+  "end": 59,
+  "lines": 11,
+  "sha": "6012a015a4e18896c0b29e7daebb1dc5ba835619b7f6e3d02ca6561f0aa441c0"
+ },
+ {
+  "name": "isCodeFile",
+  "kind": "function",
+  "start": 60,
+  "end": 64,
+  "lines": 5,
+  "sha": "b8c8af1247dd620708524a30de1b24390fcea4fbb78d3004024a8b999c8f9f1f"
+ },
+ {
+  "name": "isSupportedFile",
+  "kind": "function",
+  "start": 65,
+  "end": 69,
+  "lines": 5,
+  "sha": "5277a7fb3231cac5e3a332cce4dce9078ed8e20ed051b385ef4f2b216517593a"
+ },
+ {
+  "name": "isImageFile",
+  "kind": "function",
+  "start": 70,
+  "end": 73,
+  "lines": 4,
+  "sha": "23dd04d049e6ccb53b3abb69c2dd86baa07b4c848ab89250521677d2840cedea"
+ },
+ {
+  "name": "readFileText",
+  "kind": "function",
+  "start": 74,
+  "end": 82,
+  "lines": 9,
+  "sha": "cd09d09d46ea0a4af1cc34ea1b364c480725d67f677a82f93326a3fdec436a7b"
+ },
+ {
+  "name": "debounce",
+  "kind": "function",
+  "start": 83,
+  "end": 91,
+  "lines": 9,
+  "sha": "475d8b92f539ae2461afb1ea4899ceff462559d431004929fcf5ee66b900a5b6"
+ },
+ {
+  "name": "toast",
+  "kind": "function",
+  "start": 92,
+  "end": 105,
+  "lines": 14,
+  "sha": "3ad49ff2d6956ab08850de7464b9ec87bd9aceb726689cbef85e490fbc3fd045"
+ },
+ {
+  "name": "download",
+  "kind": "function",
+  "start": 106,
+  "end": 119,
+  "lines": 14,
+  "sha": "9dea81e40c43ca1e8e3a9cce483eff163f10002aeec2bb14a40b215801da5996"
+ },
+ {
+  "name": "COLOR_DEFS",
+  "kind": "decl",
+  "start": 120,
+  "end": 166,
+  "lines": 47,
+  "sha": "213f557b39639a084d6c8c8a300b308778a8166f70c2efd0a8fa4e573636e601"
+ },
+ {
+  "name": "PDF_COLOR_DEFS",
+  "kind": "decl",
+  "start": 167,
+  "end": 221,
+  "lines": 55,
+  "sha": "1f409378461191f4ef76e2f4fc9d0f3c73a08bf603345d4bff777a2990d3c128"
+ },
+ {
+  "name": "BASE_COLORS",
+  "kind": "decl",
+  "start": 222,
+  "end": 267,
+  "lines": 46,
+  "sha": "53f797ba3c0b1c02c98a51b3eea4cfb607aa54f1b16415ad09f781a2d825c72e"
+ },
+ {
+  "name": "PDF_BASE_COLORS",
+  "kind": "decl",
+  "start": 268,
+  "end": 283,
+  "lines": 16,
+  "sha": "c4899db1484368b93520420c4d96ec2f055074f2ba9222f51aa9582a94680a94"
+ },
+ {
+  "name": "PDF_PAGE_SIZES",
+  "kind": "decl",
+  "start": 284,
+  "end": 291,
+  "lines": 8,
+  "sha": "256a61fe3137da9a7b725a6a661ca4f6d7e131edb6604c05ae59d01c335e322b"
+ },
+ {
+  "name": "PDF_FONT_PRESETS",
+  "kind": "decl",
+  "start": 292,
+  "end": 306,
+  "lines": 15,
+  "sha": "734db9afd878c35cb2ba6c7fd5f1172ecb892219c14588adfa1ac067d03bff4a"
+ },
+ {
+  "name": "PDF_LAYOUT_DEFS",
+  "kind": "decl",
+  "start": 307,
+  "end": 322,
+  "lines": 16,
+  "sha": "4f761fd2bc3630328732bbabdeb180680bd26ad7c96b662db9f3aa70fde4d0d2"
+ },
+ {
+  "name": "PDF_LAYOUT_DEFAULTS",
+  "kind": "decl",
+  "start": 323,
+  "end": 336,
+  "lines": 14,
+  "sha": "3a2c18a5b017e61e9f7a6723126246aa1be8b24dd9d19cb62179396114cbb25f"
+ },
+ {
+  "name": "normalizePdfLayout",
+  "kind": "function",
+  "start": 337,
+  "end": 369,
+  "lines": 33,
+  "sha": "88a780c5db65a564f83c9ab5d63eb71524bff28ca3c28b0eac1f0479f7af1c8c"
+ },
+ {
+  "name": "THEMES",
+  "kind": "decl",
+  "start": 370,
+  "end": 615,
+  "lines": 246,
+  "sha": "53869483ef7a385059cbd4dab56d0a2ea410f465d555031a8806f57f83597b81"
+ },
+ {
+  "name": "completeTheme",
+  "kind": "function",
+  "start": 616,
+  "end": 641,
+  "lines": 26,
+  "sha": "226d2dc4b69c18e978a8439544ec0c45a96e43bc22b1d137edc89eebe822e5e7"
+ },
+ {
+  "name": "state",
+  "kind": "decl",
+  "start": 642,
+  "end": 676,
+  "lines": 35,
+  "sha": "b49a56fe68f2c61517df89b467a98f40115df1f11acdbc73ca1120e1a778339c"
+ },
+ {
+  "name": "registerCustomLanguages",
+  "kind": "function",
+  "start": 677,
+  "end": 700,
+  "lines": 24,
+  "sha": "65a36a15cd3576579279f577116192f4cd5806d7f6eb3c6ece81e969a9ecbed7"
+ },
+ {
+  "name": "highlightWithRules",
+  "kind": "function",
+  "start": 701,
+  "end": 728,
+  "lines": 28,
+  "sha": "97819edd4217be92c6a2008a53680c80b3d13b0a67dca76a8ae0d8205502bdb6"
+ },
+ {
+  "name": "KEEPALIVED_RULES",
+  "kind": "decl",
+  "start": 729,
+  "end": 737,
+  "lines": 9,
+  "sha": "44116a9a68ad9d7a87aa44019269c6435c0a5e3dd2fd021232b327a282de0b89"
+ },
+ {
+  "name": "PYTHON_RULES",
+  "kind": "decl",
+  "start": 738,
+  "end": 745,
+  "lines": 8,
+  "sha": "8591df5f3018e8cd89530d49ca9a2cc2bb216384e7eef416d389dc4f13dbd163"
+ },
+ {
+  "name": "JS_RULES",
+  "kind": "decl",
+  "start": 746,
+  "end": 753,
+  "lines": 8,
+  "sha": "1df2c0bf5fa7cb9209013d7db13257ce4fd7a4cb155b0c1e83af94a61317580a"
+ },
+ {
+  "name": "JSON_RULES",
+  "kind": "decl",
+  "start": 754,
+  "end": 759,
+  "lines": 6,
+  "sha": "8cea4f58837132e7d5af46039369cd1eaf04253fe8ad4f56a9354d6b1070fb18"
+ },
+ {
+  "name": "BASH_RULES",
+  "kind": "decl",
+  "start": 760,
+  "end": 772,
+  "lines": 13,
+  "sha": "809e2dfd1a0afc088a1995dc28b139a3836199a85d1b3007fd5dd19bdc8d07d9"
+ },
+ {
+  "name": "INI_RULES",
+  "kind": "decl",
+  "start": 773,
+  "end": 782,
+  "lines": 10,
+  "sha": "349079bc69594a74255fd2dfb21816e5c46201f891f4e9e0cf0146872c0f88d3"
+ },
+ {
+  "name": "CONF_RULES",
+  "kind": "decl",
+  "start": 783,
+  "end": 791,
+  "lines": 9,
+  "sha": "fbc1c4d7dc030c01dde18a3b069660d4509cd2b3a1a7282194843edac9383f08"
+ },
+ {
+  "name": "detectLanguage",
+  "kind": "function",
+  "start": 792,
+  "end": 808,
+  "lines": 17,
+  "sha": "92e0462cdfb47b73cab58df4e0e02574df98b364b8b7307cc5f4f26824697b23"
+ },
+ {
+  "name": "normalizeFenceLang",
+  "kind": "function",
+  "start": 809,
+  "end": 832,
+  "lines": 24,
+  "sha": "a199fefd3e84c42a26082b2632ae14d171d9c18e91c032a5491a497993a33b92"
+ },
+ {
+  "name": "getSyntaxRules",
+  "kind": "function",
+  "start": 833,
+  "end": 856,
+  "lines": 24,
+  "sha": "201af5acd00c6390a36986afe5481f37fe38dde1b795097b4d933284570c44d5"
+ },
+ {
+  "name": "highlightTextCode",
+  "kind": "function",
+  "start": 857,
+  "end": 873,
+  "lines": 17,
+  "sha": "c4a6169de66c2a794bf166a9d2690ae81ea5923d4b8bb3fc6292e5b3d45d812e"
+ },
+ {
+  "name": "highlightCode",
+  "kind": "function",
+  "start": 874,
+  "end": 896,
+  "lines": 23,
+  "sha": "0e66e251e06fc6b37b04178bb0616f6435e9bc29e1cf6c376744f2178221f5c8"
+ },
+ {
+  "name": "slugify",
+  "kind": "function",
+  "start": 897,
+  "end": 905,
+  "lines": 9,
+  "sha": "ff3d421caf8677af17b7d9a36b2d93c0c383f97a96136d82f6acc3eb05d74a81"
+ },
+ {
+  "name": "resolveWorkspacePath",
+  "kind": "function",
+  "start": 906,
+  "end": 928,
+  "lines": 23,
+  "sha": "454ff018d8efe903f2f826f523d93f90efe7b3b16e29e80a2536bececc9e0e49"
+ },
+ {
+  "name": "scrollToAnchor",
+  "kind": "function",
+  "start": 929,
+  "end": 937,
+  "lines": 9,
+  "sha": "e94f315092c0f3234b40351101446c2c8d9f8b37747d70c3de58763d13c0eae0"
+ },
+ {
+  "name": "builtinInline",
+  "kind": "function",
+  "start": 938,
+  "end": 948,
+  "lines": 11,
+  "sha": "a21c2daafd7bbdef5f7fa336c281313eb2074ea8f70792ba293eb2f672c279c7"
+ },
+ {
+  "name": "ALLOWED_HTML_TAG_RE",
+  "kind": "decl",
+  "start": 949,
+  "end": 954,
+  "lines": 6,
+  "sha": "0a109076c6813e1071accc1324b8aa9e6b667d3f8ed2af0bcc93f3982eea2517"
+ },
+ {
+  "name": "sanitizeAllowedTag",
+  "kind": "function",
+  "start": 955,
+  "end": 967,
+  "lines": 13,
+  "sha": "94a203249ae93eb25d1826feef5ada9ddc1b5517543ad0ea9296d85838850946"
+ },
+ {
+  "name": "extractAllowedHtmlTags",
+  "kind": "function",
+  "start": 968,
+  "end": 977,
+  "lines": 10,
+  "sha": "2ab04124b315131a72367e76a6f61b346d2a98108826d699be7af1297b1799f0"
+ },
+ {
+  "name": "restoreAllowedHtmlTags",
+  "kind": "function",
+  "start": 978,
+  "end": 984,
+  "lines": 7,
+  "sha": "43c9abbb98805b6c3e7e78682d191e8db45b970067aa4ed49a97832610a57cc9"
+ },
+ {
+  "name": "inlineRender",
+  "kind": "function",
+  "start": 985,
+  "end": 991,
+  "lines": 7,
+  "sha": "dadcbc204db7ec27ed829d1c9ccbe98925b49b62a5e94944946ad148575299fc"
+ },
+ {
+  "name": "builtinTableRow",
+  "kind": "function",
+  "start": 992,
+  "end": 995,
+  "lines": 4,
+  "sha": "edb14afbb5017a174f2b55dd019b2ef21fbe8b84d334112ea4831a95184d5061"
+ },
+ {
+  "name": "builtinParseList",
+  "kind": "function",
+  "start": 996,
+  "end": 1066,
+  "lines": 71,
+  "sha": "421d6003e3f607038e26800b400a1186778e6705b33f85db37d1960d96c574c3"
+ },
+ {
+  "name": "builtinMarkdown",
+  "kind": "function",
+  "start": 1067,
+  "end": 1169,
+  "lines": 103,
+  "sha": "df6c9de6727a5bccadb1ab20c7454d3133731a2cb45e9ecf78b1ada6afe4d5c3"
+ },
+ {
+  "name": "md",
+  "kind": "decl",
+  "start": 1170,
+  "end": 1171,
+  "lines": 2,
+  "sha": "3df25a866096ac10fc037f0a1f161cbb96780abb4a3d9251c4a26167f7691eb7"
+ },
+ {
+  "name": "initMarkdown",
+  "kind": "function",
+  "start": 1172,
+  "end": 1176,
+  "lines": 5,
+  "sha": "c9037d8e21e42561dacc3e07457bf9122188d225ef5cc943cd261842381ce90a"
+ },
+ {
+  "name": "miniMarkdown",
+  "kind": "function",
+  "start": 1177,
+  "end": 1182,
+  "lines": 6,
+  "sha": "4efaa4be3339e992c295d71428e4049e6523d3055893f27fe022717eaab33e2d"
+ },
+ {
+  "name": "extractHtmlImages",
+  "kind": "function",
+  "start": 1183,
+  "end": 1193,
+  "lines": 11,
+  "sha": "3f89831468e1d28ebbbe3d8b7e06f3a372b78ccc8738bb4c11261dedd0f4df4c"
+ },
+ {
+  "name": "resolveImageSrc",
+  "kind": "function",
+  "start": 1194,
+  "end": 1220,
+  "lines": 27,
+  "sha": "58d48e7287aaf026561e5ec332444284358bccd7c7ed74de89af6c2c907a6633"
+ },
+ {
+  "name": "restoreHtmlImages_broken",
+  "kind": "function",
+  "start": 1221,
+  "end": 1237,
+  "lines": 17,
+  "sha": "aab3561cab3421fa2a5b70965ad223f1336d2516ced0507607c03d9690bab3ac"
+ },
+ {
+  "name": "resolveWorkspacePath",
+  "kind": "function",
+  "start": 1238,
+  "end": 1260,
+  "lines": 23,
+  "sha": "454ff018d8efe903f2f826f523d93f90efe7b3b16e29e80a2536bececc9e0e49"
+ },
+ {
+  "name": "scrollToAnchor",
+  "kind": "function",
+  "start": 1261,
+  "end": 1274,
+  "lines": 14,
+  "sha": "22cd7db2aad0957b9e345b81537a8fdf2e8aac7436b4110fecf8d050dc6c09cb"
+ },
+ {
+  "name": "restoreHtmlImages",
+  "kind": "function",
+  "start": 1275,
+  "end": 1289,
+  "lines": 15,
+  "sha": "a62b8265247efba89d31833b3b59780a393b25ff479c28d5dccbc4246708b3ab"
+ },
+ {
+  "name": "highlightPreBlocks",
+  "kind": "function",
+  "start": 1290,
+  "end": 1299,
+  "lines": 10,
+  "sha": "8125c0dc0af9eb846c7a4f3587e80cfe2a72561e1caac0a8e064453d05062b98"
+ },
+ {
+  "name": "renderCodeContent",
+  "kind": "function",
+  "start": 1300,
+  "end": 1307,
+  "lines": 8,
+  "sha": "0c870814e857cfe9df9a5a930e4acef5a519a3843f31b2c38feb675b97141058"
+ },
+ {
+  "name": "renderMarkdown",
+  "kind": "function",
+  "start": 1308,
+  "end": 1358,
+  "lines": 51,
+  "sha": "1fbb8f6da27bcbed54de324b14081d7ecaeb808e1c7841c126afd1eb8e04dc61"
+ },
+ {
+  "name": "inlineImagesForExport",
+  "kind": "function",
+  "start": 1359,
+  "end": 1385,
+  "lines": 27,
+  "sha": "e11b9bf7ec1dce9ae1de921b823186abc9c2c4fa9e66247c009214924de8c3bb"
+ },
+ {
+  "name": "exportCurrentHtml",
+  "kind": "function",
+  "start": 1386,
+  "end": 1459,
+  "lines": 74,
+  "sha": "6c945eeffc8d43667154fb519651f872b1642b0d480c9ec34e701b079c8f50cc"
+ },
+ {
+  "name": "buildPdfCss",
+  "kind": "function",
+  "start": 1460,
+  "end": 1518,
+  "lines": 59,
+  "sha": "2b656d81d5a09e36153a2378d65555f0f498ed2fa7a970776102c7e8b0c2b1ba"
+ },
+ {
+  "name": "buildPdfDocumentHtml",
+  "kind": "function",
+  "start": 1519,
+  "end": 1529,
+  "lines": 11,
+  "sha": "1d74c456a49c87ed949f4cbe2a83328341ae449cd4a7e6bd149dbfddc4c04347"
+ },
+ {
+  "name": "exportCurrentPdf",
+  "kind": "function",
+  "start": 1530,
+  "end": 1581,
+  "lines": 52,
+  "sha": "291440fac3130f1354819378ce1b0af466331e55047b31370a4f47282a818325"
+ },
+ {
+  "name": "resetImageMap",
+  "kind": "function",
+  "start": 1582,
+  "end": 1592,
+  "lines": 11,
+  "sha": "e38171ae68a05267396719556b99add21b238e052bf88a1fe0efd44dc1853341"
+ },
+ {
+  "name": "resetToWelcome",
+  "kind": "function",
+  "start": 1593,
+  "end": 1602,
+  "lines": 10,
+  "sha": "7dfefae6c0df147fce7ab6f1163780da519bc3fe63df3e24006fa5e0e0206c46"
+ },
+ {
+  "name": "indexFiles",
+  "kind": "function",
+  "start": 1603,
+  "end": 1653,
+  "lines": 51,
+  "sha": "4370676750cf3188718aa04f2369452bee888780f642179102a6b4429459c2a1"
+ },
+ {
+  "name": "buildSnapshotInMemory",
+  "kind": "function",
+  "start": 1654,
+  "end": 1665,
+  "lines": 12,
+  "sha": "95428ca44e0b56efc220975e60800bab6d0c4c96ab748d3f6277a639af05ec38"
+ },
+ {
+  "name": "appendFiles",
+  "kind": "function",
+  "start": 1666,
+  "end": 1711,
+  "lines": 46,
+  "sha": "f7f4fa8aacdacae3d6d9a186bff62457f76cb96c89ff561d7e29966ec418ffb7"
+ },
+ {
+  "name": "appendFileItem",
+  "kind": "function",
+  "start": 1712,
+  "end": 1730,
+  "lines": 19,
+  "sha": "648155d4d8cc67097536f23bb2c75106e26485790e921f306dea0ebf2dc0b155"
+ },
+ {
+  "name": "buildTree",
+  "kind": "function",
+  "start": 1731,
+  "end": 1751,
+  "lines": 21,
+  "sha": "b9d9af6a2d23bdfaf3ff07a5324bb38a4f3a3fd39313042aae546d86621bb9a7"
+ },
+ {
+  "name": "indexWrappedFiles",
+  "kind": "function",
+  "start": 1752,
+  "end": 1786,
+  "lines": 35,
+  "sha": "bb02ab9ea29926cf7b723d66aefcdec8d454f624f6e2704a4a7dccf68452854a"
+ },
+ {
+  "name": "getDirectoryHandleByPath",
+  "kind": "function",
+  "start": 1787,
+  "end": 1796,
+  "lines": 10,
+  "sha": "6594d7b0a04298e45503bc53ea6200d28ef759527f3e8955595968c81ae8bc69"
+ },
+ {
+  "name": "renameFile",
+  "kind": "function",
+  "start": 1797,
+  "end": 1856,
+  "lines": 60,
+  "sha": "9398c57bcc014c77e19e08e6007d593634b37246983ff524e7d5dc8fa6123bdb"
+ },
+ {
+  "name": "renderTree",
+  "kind": "function",
+  "start": 1857,
+  "end": 1899,
+  "lines": 43,
+  "sha": "070d940f7e5d0c26299b4a6903186aba07c7c6e4454b7642bb397fc3461dce52"
+ },
+ {
+  "name": "buildSearchSnippet",
+  "kind": "function",
+  "start": 1900,
+  "end": 1926,
+  "lines": 27,
+  "sha": "e53a5f83a9f56c49e52813aa89d1bea7536dfbfcdd3f04a341696dde68f0e3f9"
+ },
+ {
+  "name": "renderSearchResults",
+  "kind": "function",
+  "start": 1927,
+  "end": 1989,
+  "lines": 63,
+  "sha": "91779938e597bcc6696db62e6e0a027b701d0630f21e16c1ca37406e61740d9a"
+ },
+ {
+  "name": "CONTENT_SEARCH_MAX_RESULTS",
+  "kind": "decl",
+  "start": 1990,
+  "end": 1991,
+  "lines": 2,
+  "sha": "7ba04270ac84fa12bf2a7b41251ad610c1f6ff796c7a786e37801a3638fcb944"
+ },
+ {
+  "name": "readSearchFileText",
+  "kind": "function",
+  "start": 1992,
+  "end": 2010,
+  "lines": 19,
+  "sha": "fafc4cb7f7db35e39c2703756ebfb84f76afc90f9f0e497620edfa76f5bd0120"
+ },
+ {
+  "name": "collectLineMatches",
+  "kind": "function",
+  "start": 2011,
+  "end": 2064,
+  "lines": 54,
+  "sha": "634f7a14314ec5aa5e17e83ee78cbe58c0bcf4ce33089e07ae85c5072f722c02"
+ },
+ {
+  "name": "performContentSearch",
+  "kind": "function",
+  "start": 2065,
+  "end": 2116,
+  "lines": 52,
+  "sha": "8ce03422a3e2d4d8bafaece599c0871135da4a43a5b40abfaa386270e6c42f53"
+ },
+ {
+  "name": "expandAncestors",
+  "kind": "function",
+  "start": 2117,
+  "end": 2128,
+  "lines": 12,
+  "sha": "cf3f32ecfe1827b203a9da4ada4b3fbd341e5feb036cd7bc13764977ea8dbb67"
+ },
+ {
+  "name": "renderNode",
+  "kind": "function",
+  "start": 2129,
+  "end": 2153,
+  "lines": 25,
+  "sha": "50bf3f252ec6ad496b72c271e43be295ded19f9d8274ff8d764678663612e8f6"
+ },
+ {
+  "name": "renderOutline",
+  "kind": "function",
+  "start": 2154,
+  "end": 2168,
+  "lines": 15,
+  "sha": "ad028335f5e17e03426e4c12f4cb7029168a538cd449c8e3b994ebc86dac75a7"
+ },
+ {
+  "name": "setSidebarTab",
+  "kind": "function",
+  "start": 2169,
+  "end": 2182,
+  "lines": 14,
+  "sha": "a1e1121ea8ccf1f880a8030ad1677915ea8a612cdb652f5d4100803e06b4d9a1"
+ },
+ {
+  "name": "updateSidebarHandle",
+  "kind": "function",
+  "start": 2183,
+  "end": 2187,
+  "lines": 5,
+  "sha": "baccbe31c451e1507c2e6eee44f8df44e3ee28614ebe79e7fa0ede7b3381f30a"
+ },
+ {
+  "name": "toggleSidebar",
+  "kind": "function",
+  "start": 2188,
+  "end": 2198,
+  "lines": 11,
+  "sha": "18824abadb44ccf34c38b6f95e6d4ad30e0b190e474db83e4d8ee241266f24c0"
+ },
+ {
+  "name": "loadSidebarState",
+  "kind": "function",
+  "start": 2199,
+  "end": 2208,
+  "lines": 10,
+  "sha": "a775aac0a524df9ef91306f0528ac8c77bf62a92f569db9dee7142f1d87e0339"
+ },
+ {
+  "name": "updateToolbarHandle",
+  "kind": "function",
+  "start": 2209,
+  "end": 2213,
+  "lines": 5,
+  "sha": "a9182081845fdd6510c9ac8c19b15322568ec0553dc58503ffa37e9a4a90b1b9"
+ },
+ {
+  "name": "toggleToolbar",
+  "kind": "function",
+  "start": 2214,
+  "end": 2224,
+  "lines": 11,
+  "sha": "0a5e2e87b3678b2f60bde2ef063a8d68feae9bf15d7a0c8467951e6c54986ea2"
+ },
+ {
+  "name": "loadToolbarState",
+  "kind": "function",
+  "start": 2225,
+  "end": 2236,
+  "lines": 12,
+  "sha": "fc28916ebf49ae31ff9b3e2d6f09ef300bd4471261c9004b2083e46572889094"
+ },
+ {
+  "name": "getFreshFile",
+  "kind": "function",
+  "start": 2237,
+  "end": 2263,
+  "lines": 27,
+  "sha": "6209dc7f9647d4966bfc76ec4b272492b808f66407a8b0f88ba2e3bfad79c806"
+ },
+ {
+  "name": "openFile",
+  "kind": "function",
+  "start": 2264,
+  "end": 2291,
+  "lines": 28,
+  "sha": "f2e96fb8a7b12850e03b85ba8fa8b3a6a37d5cff20009b305e2a6823b2daaa4a"
+ },
+ {
+  "name": "openFileByPath",
+  "kind": "function",
+  "start": 2292,
+  "end": 2296,
+  "lines": 5,
+  "sha": "76f644da48aa9b4b0f4151e751436bc66098a75a1990c37bb30e5456ad1fc840"
+ },
+ {
+  "name": "scrollToSourceLine",
+  "kind": "function",
+  "start": 2297,
+  "end": 2351,
+  "lines": 55,
+  "sha": "95a14a41bffd8e85a90b52547f1d12356dda480ac47e9625523e101246d60b8c"
+ },
+ {
+  "name": "openFileAndJumpToLine",
+  "kind": "function",
+  "start": 2352,
+  "end": 2370,
+  "lines": 19,
+  "sha": "0e0acd0fa754bda5bd2cf3d12300b317d2e2481cd7fe1d40f8729d7d787420d0"
+ },
+ {
+  "name": "writeCurrentTextToDisk",
+  "kind": "function",
+  "start": 2371,
+  "end": 2435,
+  "lines": 65,
+  "sha": "7973a700b6cd8e720585cbcbb0f05116007e5beaa737e8755740812b1d299a03"
+ },
+ {
+  "name": "applySourceChange",
+  "kind": "function",
+  "start": 2436,
+  "end": 2460,
+  "lines": 25,
+  "sha": "94905a616d5fd95d4f0636721a9e4f4084c8199620b92887a441b7de51e7d002"
+ },
+ {
+  "name": "buildLooseSourceRegex",
+  "kind": "function",
+  "start": 2461,
+  "end": 2473,
+  "lines": 13,
+  "sha": "bf5aa2e7791b7b81ee63b02d38b4cb0f4a584b5aacfefb33d4fef935cb5ba106"
+ },
+ {
+  "name": "findUniqueSourceMatch",
+  "kind": "function",
+  "start": 2474,
+  "end": 2488,
+  "lines": 15,
+  "sha": "bc2a48ef8bed74d6bf8e73653985eabcc369837b9c100c01e42d8b7fff392f70"
+ },
+ {
+  "name": "captureSelectionRange",
+  "kind": "function",
+  "start": 2489,
+  "end": 2496,
+  "lines": 8,
+  "sha": "c305a35a8c7f677a43caff1df1e80c1bbaa902d34d535f62a2b49defd3016b3d"
+ },
+ {
+  "name": "locateSelectionInSource",
+  "kind": "function",
+  "start": 2497,
+  "end": 2592,
+  "lines": 96,
+  "sha": "74c199ec004e02b2ea02a0b3030fac7f857da394bfb1ec3c6091d96f13e4f94f"
+ },
+ {
+  "name": "findBalancedFontWrap",
+  "kind": "function",
+  "start": 2593,
+  "end": 2621,
+  "lines": 29,
+  "sha": "e0518249d10daa1884815e62d14c450eef9ecdfc8090888d012f827c70e5e8db"
+ },
+ {
+  "name": "findOutermostFontSpan",
+  "kind": "function",
+  "start": 2622,
+  "end": 2648,
+  "lines": 27,
+  "sha": "2c17b9b25ea09522ea766e0250442aaff4754a4c3634e306dc7a204084c9b536"
+ },
+ {
+  "name": "applyColorToSelection",
+  "kind": "function",
+  "start": 2649,
+  "end": 2680,
+  "lines": 32,
+  "sha": "ad163abe66a4f72f2fd93203b4b9a313884ca5ab0f9fadc5270a9fcea81e17cf"
+ },
+ {
+  "name": "removeColorFromSelection",
+  "kind": "function",
+  "start": 2681,
+  "end": 2705,
+  "lines": 25,
+  "sha": "99bef0315582efb1720924e47ebf7baca52023b4ab27abf41fbae172fa4c1b7e"
+ },
+ {
+  "name": "resolveSourceLine",
+  "kind": "function",
+  "start": 2706,
+  "end": 2788,
+  "lines": 83,
+  "sha": "480100b46972158d39569310d5a3956a5c24807eb4472a0532cf47664fcfce37"
+ },
+ {
+  "name": "focusEditorAtStart",
+  "kind": "function",
+  "start": 2789,
+  "end": 2808,
+  "lines": 20,
+  "sha": "0711c09e326403adc769b22bc1df9cc2d53010bc906cb58cb98e58152004faef"
+ },
+ {
+  "name": "captureContentScroll",
+  "kind": "function",
+  "start": 2809,
+  "end": 2817,
+  "lines": 9,
+  "sha": "e187be1213bb048ad868cfdabb3594e685d5aa7f2bbf3bca959a24085b11f8d9"
+ },
+ {
+  "name": "restoreContentScroll",
+  "kind": "function",
+  "start": 2818,
+  "end": 2824,
+  "lines": 7,
+  "sha": "ae39376de32463cb03bc3c27a1354ebdd8548491d468bcfb62bb24e849576e5c"
+ },
+ {
+  "name": "startEditTextElement",
+  "kind": "function",
+  "start": 2825,
+  "end": 2924,
+  "lines": 100,
+  "sha": "1b4630169bbd136f9965d2a0b3165e0142e178ba0d94e5addecd718703ea9153"
+ },
+ {
+  "name": "matchFenceLine",
+  "kind": "function",
+  "start": 2925,
+  "end": 2940,
+  "lines": 16,
+  "sha": "6a3aecaee977e031b668ae133c212dcb286ac6f870223740982019a2329ed535"
+ },
+ {
+  "name": "matchQuotePrefix",
+  "kind": "function",
+  "start": 2941,
+  "end": 2952,
+  "lines": 12,
+  "sha": "addf42ab569455833af20dc5bbc2cc78685fd2da8f32322c5bec2412ce74d4e1"
+ },
+ {
+  "name": "stripQuotePrefix",
+  "kind": "function",
+  "start": 2953,
+  "end": 2961,
+  "lines": 9,
+  "sha": "251a096dfbb9de5ac5c979160ee0f72164d8da1936788b852fdfbf4925a9b853"
+ },
+ {
+  "name": "isFenceClose",
+  "kind": "function",
+  "start": 2962,
+  "end": 2967,
+  "lines": 6,
+  "sha": "5651442b6b8ff389a1fb0ca0950267c07fe28b7fc4697ae832966123eaa72b72"
+ },
+ {
+  "name": "stripFencePrefix",
+  "kind": "function",
+  "start": 2968,
+  "end": 2976,
+  "lines": 9,
+  "sha": "a6ccbf11fffaaf59ebb41a8c1c5c5a566acedd9cc95e0189c65e371ab8af773c"
+ },
+ {
+  "name": "normalizeBlockCode",
+  "kind": "function",
+  "start": 2977,
+  "end": 2980,
+  "lines": 4,
+  "sha": "402df1c5e79707cc73db3dd937a2867816484b24109e00c7e94fd236f5ba7621"
+ },
+ {
+  "name": "isQuoteFencePrefix",
+  "kind": "function",
+  "start": 2981,
+  "end": 2985,
+  "lines": 5,
+  "sha": "e8319316f91606c53087a1e1403c7520467640ae7214e36001d508ccbe444244"
+ },
+ {
+  "name": "findFenceClose",
+  "kind": "function",
+  "start": 2986,
+  "end": 2997,
+  "lines": 12,
+  "sha": "8330d51cf5ccae2d88f02028013eabb5d5d63e47b16bc9ae253db6f5b5c4beb7"
+ },
+ {
+  "name": "readFenceBlock",
+  "kind": "function",
+  "start": 2998,
+  "end": 3010,
+  "lines": 13,
+  "sha": "6c8dcdc6ece15dc1831b91d3b78090fd02c6f9c570f5c65a6a3b0d6ce2d099f7"
+ },
+ {
+  "name": "fenceBlockMatches",
+  "kind": "function",
+  "start": 3011,
+  "end": 3021,
+  "lines": 11,
+  "sha": "9c4e11cc556f75108fb60eadb8f011ea3f4b3a905f6d3a3c5207cf1224d56e29"
+ },
+ {
+  "name": "findCodeBlockForOldCode",
+  "kind": "function",
+  "start": 3022,
+  "end": 3034,
+  "lines": 13,
+  "sha": "8885514692b6b755dfb0ee4bbe5e277378ce30fd99d9b20afa0597352a62e03a"
+ },
+ {
+  "name": "resolveCodeFenceLine",
+  "kind": "function",
+  "start": 3035,
+  "end": 3060,
+  "lines": 26,
+  "sha": "70c66b6c00b932e3251311e607ff82e69d9ac1d6bc061c0f790457f10930ed0e"
+ },
+ {
+  "name": "CODE_LANG_SUGGESTIONS",
+  "kind": "decl",
+  "start": 3061,
+  "end": 3063,
+  "lines": 3,
+  "sha": "11507340d280436d2f4e7fbbbd4c6dcac47d8d16f9bb7564b65dca1aa86bb1fe"
+ },
+ {
+  "name": "showCodeLangPicker",
+  "kind": "function",
+  "start": 3064,
+  "end": 3129,
+  "lines": 66,
+  "sha": "e50f896dbff54361d048fd72aa7eed0887553334bab7585854af9a8a676d1bf8"
+ },
+ {
+  "name": "changeCodeBlockType",
+  "kind": "function",
+  "start": 3130,
+  "end": 3163,
+  "lines": 34,
+  "sha": "e9518e8d3aee78ba74a9271e33fee3aef24085d4e23e5db88a3bd34550e361e8"
+ },
+ {
+  "name": "startEditCodeBlock",
+  "kind": "function",
+  "start": 3164,
+  "end": 3241,
+  "lines": 78,
+  "sha": "516e01f71c26f4dc933635c9af68e057fb2f5473fdb31b4ba058e11bcc5cdf6f"
+ },
+ {
+  "name": "startEditCodeFile",
+  "kind": "function",
+  "start": 3242,
+  "end": 3294,
+  "lines": 53,
+  "sha": "74e4ca58c6bce81aebaacd5accb88b4d9c50214c61f27f9d897ed9baf901771d"
+ },
+ {
+  "name": "startEditTable",
+  "kind": "function",
+  "start": 3295,
+  "end": 3359,
+  "lines": 65,
+  "sha": "2924e1a94c10c6af0fa9b64506f64116f4c1eb7b17cc78cb0a306b5b829018ac"
+ },
+ {
+  "name": "activeInsertEditor",
+  "kind": "decl",
+  "start": 3360,
+  "end": 3368,
+  "lines": 9,
+  "sha": "52487527c77b0475942163a0f630fe557c0eba6e208c6a12fd995d2c539c4044"
+ },
+ {
+  "name": "getTopLevelBlock",
+  "kind": "function",
+  "start": 3369,
+  "end": 3377,
+  "lines": 9,
+  "sha": "30bf99609a6e8ae5bf89cc0397481790154edec5018b3d857819fa51d440e49a"
+ },
+ {
+  "name": "computeBlockEndLine",
+  "kind": "function",
+  "start": 3378,
+  "end": 3405,
+  "lines": 28,
+  "sha": "dbd4d257d043cc94790dd85bc3b0f8997443b0d4fb6a27555f699861a65efcb7"
+ },
+ {
+  "name": "getBlockRange",
+  "kind": "function",
+  "start": 3406,
+  "end": 3419,
+  "lines": 14,
+  "sha": "36a1ba09674989b39a4c0f2b49cf61dfc635ab7e1e8087bdad5371802ea3e606"
+ },
+ {
+  "name": "fenceBlockAtLine",
+  "kind": "function",
+  "start": 3420,
+  "end": 3441,
+  "lines": 22,
+  "sha": "849e7401aec2d2b5116a2b8ca544a8fc9b7553dd79432de0f1f500f26b58509c"
+ },
+ {
+  "name": "makeInsertContext",
+  "kind": "function",
+  "start": 3442,
+  "end": 3461,
+  "lines": 20,
+  "sha": "4cc6ebe85fdad9cea5297758e735cb231e2f5b4cbbe388cf3348b53bf014729d"
+ },
+ {
+  "name": "clampLineOffset",
+  "kind": "function",
+  "start": 3462,
+  "end": 3473,
+  "lines": 12,
+  "sha": "b8a761ea683f6886b875b570844704c06838f89083ce8fdf71df46bd94dfb71b"
+ },
+ {
+  "name": "findLineHost",
+  "kind": "function",
+  "start": 3474,
+  "end": 3489,
+  "lines": 16,
+  "sha": "d6886f18fb301adcaa1c979996b23650275cbf6ae68bb717ba337fb21b0e72c7"
+ },
+ {
+  "name": "countLineBreaksBefore",
+  "kind": "function",
+  "start": 3490,
+  "end": 3513,
+  "lines": 24,
+  "sha": "639f6ec21647603dc14b4a0a7603eb418e01471135b6573c162a7cd71bafd817"
+ },
+ {
+  "name": "resolveLineAtPoint",
+  "kind": "function",
+  "start": 3514,
+  "end": 3620,
+  "lines": 107,
+  "sha": "b33c5d6c3d2469ac940e667551bf22fee78277a339c197552e239830ac262991"
+ },
+ {
+  "name": "isParagraphLine",
+  "kind": "function",
+  "start": 3621,
+  "end": 3641,
+  "lines": 21,
+  "sha": "f82b1ccfe52d724c5f625d6c2d14ec37cfe47aefdde7e3048cc40ba834f3727a"
+ },
+ {
+  "name": "firstNonEmptyLine",
+  "kind": "function",
+  "start": 3642,
+  "end": 3650,
+  "lines": 9,
+  "sha": "49089973ec3b167d28ba504d93d2e7d472385f7999f8d34f0727d7d7d82d723a"
+ },
+ {
+  "name": "lastNonEmptyLine",
+  "kind": "function",
+  "start": 3651,
+  "end": 3658,
+  "lines": 8,
+  "sha": "60c723071abc9f703a0fce0f245f3d3c577f161cc936542352e8246247e272db"
+ },
+ {
+  "name": "computeInsertPadding",
+  "kind": "function",
+  "start": 3659,
+  "end": 3668,
+  "lines": 10,
+  "sha": "23844b0b5221dbea55d836523a1663c1ed0b85831b20dba08202fb23daf10fdd"
+ },
+ {
+  "name": "INDENT_UNIT",
+  "kind": "decl",
+  "start": 3669,
+  "end": 3678,
+  "lines": 10,
+  "sha": "62ef00520ddb556cffe414a49d8ab0345f9b030a82a3cf4fbc7837a847540b23"
+ },
+ {
+  "name": "previousBlockSibling",
+  "kind": "function",
+  "start": 3679,
+  "end": 3687,
+  "lines": 9,
+  "sha": "1c58165e3fe54436ddecc3dcff704592af8ea8151eeb12d82866d76197151778"
+ },
+ {
+  "name": "resolveIndentElement",
+  "kind": "function",
+  "start": 3688,
+  "end": 3698,
+  "lines": 11,
+  "sha": "c5a57b7b6aa87ebbb55d6bb56b83ba058c67babd0d248738fde6dea65e64866a"
+ },
+ {
+  "name": "countQuoteAncestors",
+  "kind": "function",
+  "start": 3699,
+  "end": 3709,
+  "lines": 11,
+  "sha": "1acfdb23dc1921d9b56a4c8423ed5b386aa04bb25c036e79eb566a0b9e1c96d8"
+ },
+ {
+  "name": "ancestorQuotePrefix",
+  "kind": "function",
+  "start": 3710,
+  "end": 3725,
+  "lines": 16,
+  "sha": "b6d8c7464b97751540cd5cf5cd76d34224e27face2849e42c6780d8a8af09487"
+ },
+ {
+  "name": "buildIndentedLines",
+  "kind": "function",
+  "start": 3726,
+  "end": 3752,
+  "lines": 27,
+  "sha": "88f17026e4f8203d38d805715d4d1c963d384cc168e2ea540ae9d60f68c45d60"
+ },
+ {
+  "name": "computeIndentAvailability",
+  "kind": "function",
+  "start": 3753,
+  "end": 3776,
+  "lines": 24,
+  "sha": "cd92efb3cf956549f9af7a507b7170ad42ca7ede0d63a315c5f65a06bfa71ce0"
+ },
+ {
+  "name": "listItemContainingLine",
+  "kind": "function",
+  "start": 3777,
+  "end": 3793,
+  "lines": 17,
+  "sha": "ce42711eef1d144c916331a848547ca7f82d48c9dece38955c6b8f2d3b26ab22"
+ },
+ {
+  "name": "applyIndentBlock",
+  "kind": "function",
+  "start": 3794,
+  "end": 3825,
+  "lines": 32,
+  "sha": "614ae97551c9786a3a5a6f4f6252e7efdef6a40da1b1ea65c26ded5d98d14e13"
+ },
+ {
+  "name": "isListItemLine",
+  "kind": "function",
+  "start": 3826,
+  "end": 3832,
+  "lines": 7,
+  "sha": "8037c6bf21d9d9d56ff328c83615ba97b3c8d54c7dfb2698e1e46dfed28e4a91"
+ },
+ {
+  "name": "deleteSourceLines",
+  "kind": "function",
+  "start": 3833,
+  "end": 3858,
+  "lines": 26,
+  "sha": "95d1f5d1d1a3b5dbf331a8fc0060c10d0d27e7e7b3653f22df38de2477fc1635"
+ },
+ {
+  "name": "deleteBlock",
+  "kind": "function",
+  "start": 3859,
+  "end": 3885,
+  "lines": 27,
+  "sha": "437e364694ef40df7e4f605f3f5422d339d245fd8ec75ee9d269acb8bb0223e8"
+ },
+ {
+  "name": "resolveBlankInsertContext",
+  "kind": "function",
+  "start": 3886,
+  "end": 3902,
+  "lines": 17,
+  "sha": "aec08ba3d4cd80f09cf949a6b79a03736de53260e275e5ac6211a96a21004f4e"
+ },
+ {
+  "name": "showInsertPreview",
+  "kind": "function",
+  "start": 3903,
+  "end": 3945,
+  "lines": 43,
+  "sha": "2bbd9102634025e66835e10a4896804b700d949d31b70032bfa71a522bcdde4f"
+ },
+ {
+  "name": "hideInsertPreview",
+  "kind": "function",
+  "start": 3946,
+  "end": 3950,
+  "lines": 5,
+  "sha": "e65026a3edb75c310dc608154d875943b2b2136d3117a227f014d2e746acbaf8"
+ },
+ {
+  "name": "getInsertLangDatalist",
+  "kind": "function",
+  "start": 3951,
+  "end": 3965,
+  "lines": 15,
+  "sha": "7044451f07facb53a6e397ecd20711477004a2303bdda1ad21f0c784da185d2a"
+ },
+ {
+  "name": "startInsertEditor",
+  "kind": "function",
+  "start": 3966,
+  "end": 4193,
+  "lines": 228,
+  "sha": "6d17f6875309a48b8a9dfd6bf904d4694225abdc71cd29d2674bc8c775f91da2"
+ },
+ {
+  "name": "undoLastEdit",
+  "kind": "function",
+  "start": 4194,
+  "end": 4208,
+  "lines": 15,
+  "sha": "90fc475f629f72b64d93381443a8e7945c5b5cac8114510398587c1ad5ada572"
+ },
+ {
+  "name": "copyTextToClipboard",
+  "kind": "function",
+  "start": 4209,
+  "end": 4230,
+  "lines": 22,
+  "sha": "fcf70be2a8e660c27ac074eb558b8f2215f5fee953bb55765a989ce4ab2cb69b"
+ },
+ {
+  "name": "readEntry",
+  "kind": "function",
+  "start": 4231,
+  "end": 4260,
+  "lines": 30,
+  "sha": "117738ccf3536baf1addfab91349c6c00607aac88a4d646908ef7f561e82fb6b"
+ },
+ {
+  "name": "DB_NAME",
+  "kind": "decl",
+  "start": 4261,
+  "end": 4262,
+  "lines": 2,
+  "sha": "ecd7c280484f1b2164b1470ec59d46d29da97761b4e77d0c7bd9c962d926cfe8"
+ },
+ {
+  "name": "DB_VERSION",
+  "kind": "decl",
+  "start": 4263,
+  "end": 4264,
+  "lines": 2,
+  "sha": "65d5a46343f047ff546b58d5689b1b48fc6d7b7b371e30b725bfcd9a1be4dc41"
+ },
+ {
+  "name": "openIndexedDB",
+  "kind": "function",
+  "start": 4265,
+  "end": 4282,
+  "lines": 18,
+  "sha": "69d66608171b9a2a6d9fbeb636141ee457a379afe87b81e9d746fd1494868af3"
+ },
+ {
+  "name": "saveDefaultDirectoryHandle",
+  "kind": "function",
+  "start": 4283,
+  "end": 4293,
+  "lines": 11,
+  "sha": "bb4cbb65a00cd1e5ceadc99bd09bceffbceb7e5d0dbf97deb8c357b2b2ed0882"
+ },
+ {
+  "name": "getDefaultDirectoryHandle",
+  "kind": "function",
+  "start": 4294,
+  "end": 4304,
+  "lines": 11,
+  "sha": "2bf25c92bdd6ce6f44fa3a5e75be6bdd841ad6ee0b8b48071a920c9e06f005d1"
+ },
+ {
+  "name": "SNAPSHOT_MAX_FILES",
+  "kind": "decl",
+  "start": 4305,
+  "end": 4309,
+  "lines": 5,
+  "sha": "11e9c2019c53a118ca1a072f0fde80fc56506a32acb4f2d75f36357510ef8784"
+ },
+ {
+  "name": "SNAPSHOT_MAX_TOTAL_BYTES",
+  "kind": "decl",
+  "start": 4310,
+  "end": 4310,
+  "lines": 1,
+  "sha": "9f26602408d48a3e0abbd4d67f6f844b2d89a513fde1fda5fad4b98ef200703f"
+ },
+ {
+  "name": "SNAPSHOT_MAX_IMAGE_BYTES",
+  "kind": "decl",
+  "start": 4311,
+  "end": 4312,
+  "lines": 2,
+  "sha": "34bd982b0fa41a20654d4f77e29d7d7f2a452a96196c6d3fdff7a6bbde57ff4b"
+ },
+ {
+  "name": "readFileAsDataUrl",
+  "kind": "function",
+  "start": 4313,
+  "end": 4321,
+  "lines": 9,
+  "sha": "6784906b3ff911259cbb3ccf5566a5b65264ec35f9b68d6d2ea3acea8ec56c78"
+ },
+ {
+  "name": "folderItemsFromFileList",
+  "kind": "function",
+  "start": 4322,
+  "end": 4330,
+  "lines": 9,
+  "sha": "1cd59a61041d5b4330a9dca790238b4386ced857470eee6032ef660c5766e63e"
+ },
+ {
+  "name": "buildFolderSnapshot",
+  "kind": "function",
+  "start": 4331,
+  "end": 4357,
+  "lines": 27,
+  "sha": "911cd236368a8682986688c0dd05527f593be117e2066abe12ac83a465e45fe3"
+ },
+ {
+  "name": "saveSnapshotToDb",
+  "kind": "function",
+  "start": 4358,
+  "end": 4368,
+  "lines": 11,
+  "sha": "570947aaaf8d3dfce49f57f88f00c31320887fd1e0cf940e19a1973967ce36a7"
+ },
+ {
+  "name": "getSnapshotFromDb",
+  "kind": "function",
+  "start": 4369,
+  "end": 4379,
+  "lines": 11,
+  "sha": "8092f401d107926f8497754800886d83a3551a0ea88a3ce3dd8d99a62ed860a8"
+ },
+ {
+  "name": "saveDefaultDirectorySnapshot",
+  "kind": "function",
+  "start": 4380,
+  "end": 4390,
+  "lines": 11,
+  "sha": "0fd3166191b9572faf425b0daa2c19768c8ba9ad340d0caee02a8ce55dcf061b"
+ },
+ {
+  "name": "restoreFromSnapshot",
+  "kind": "function",
+  "start": 4391,
+  "end": 4428,
+  "lines": 38,
+  "sha": "e5f940130407a3a1b5c6694cdf333019e1e5a06fca8222938fd0da917f84c738"
+ },
+ {
+  "name": "saveThemeToIndexedDB",
+  "kind": "function",
+  "start": 4429,
+  "end": 4441,
+  "lines": 13,
+  "sha": "4a9c0900fce1dd856dd149bd5ac43925d56f24ca92397e6c67e8c96e372b09d5"
+ },
+ {
+  "name": "loadThemeFromIndexedDB",
+  "kind": "function",
+  "start": 4442,
+  "end": 4455,
+  "lines": 14,
+  "sha": "93df9003dd672d8b41ab5b307bd90ff2c21052cca2adc32d86da3a3ecb7b83a9"
+ },
+ {
+  "name": "listFilesFromDirectoryHandle",
+  "kind": "function",
+  "start": 4456,
+  "end": 4475,
+  "lines": 20,
+  "sha": "1a0e4530470ff8058daee72839a002ad7321b47ece69608d88f6fd8e3db6ef7c"
+ },
+ {
+  "name": "openDirectoryPicker",
+  "kind": "function",
+  "start": 4476,
+  "end": 4512,
+  "lines": 37,
+  "sha": "809ce0e65c3c55f7bfbf36870ae11f145d8c207c3abcb192e8a91181c2916f84"
+ },
+ {
+  "name": "setCurrentDirectoryAsDefault",
+  "kind": "function",
+  "start": 4513,
+  "end": 4554,
+  "lines": 42,
+  "sha": "3c20261df98d8577b59acf2cc9b9e1ae36beb134c0be06c0c87d7b33ec2af771"
+ },
+ {
+  "name": "restoreDefaultDirectory",
+  "kind": "function",
+  "start": 4555,
+  "end": 4611,
+  "lines": 57,
+  "sha": "67d3ec2c332c41b6e7eabaef73b6c04694fdbb0c8db2017e79f59cb6441726c2"
+ },
+ {
+  "name": "openDefaultDirectoryManually",
+  "kind": "function",
+  "start": 4612,
+  "end": 4656,
+  "lines": 45,
+  "sha": "96760b23bfb06fff4ae6c8db0dceed7ed493a1ab4ca830639693a3005a64a9aa"
+ },
+ {
+  "name": "themeCss",
+  "kind": "function",
+  "start": 4657,
+  "end": 4719,
+  "lines": 63,
+  "sha": "997e155e74df59985a9339dcd13dcabe8960b319bd38568f1c13b12090af7440"
+ },
+ {
+  "name": "applyTheme",
+  "kind": "function",
+  "start": 4720,
+  "end": 4734,
+  "lines": 15,
+  "sha": "39fc204858fb62a493bdf2da91e5eca55e8dcfbde5446ddd93639b3ddcde7f34"
+ },
+ {
+  "name": "saveThemeToStorage",
+  "kind": "function",
+  "start": 4735,
+  "end": 4744,
+  "lines": 10,
+  "sha": "776c12854d1695e1b9a3e618e16ce9f5a0a8a09952f4344380f6c9354a55d165"
+ },
+ {
+  "name": "themeExportData",
+  "kind": "function",
+  "start": 4745,
+  "end": 4755,
+  "lines": 11,
+  "sha": "96c7e5c6fe6c78469162abc27f39183e4516ab4f3c2e3f04301a76e04a1260a2"
+ },
+ {
+  "name": "loadPdfColors",
+  "kind": "function",
+  "start": 4756,
+  "end": 4770,
+  "lines": 15,
+  "sha": "b6916e6d050c5990512925263b99ddb5798041fd30f1c9389bc855149f16297a"
+ },
+ {
+  "name": "savePdfColors",
+  "kind": "function",
+  "start": 4771,
+  "end": 4778,
+  "lines": 8,
+  "sha": "6be3836f7d201f9c7890aab494732741bf2861b38649305fa6080b23357feccd"
+ },
+ {
+  "name": "loadPdfLayout",
+  "kind": "function",
+  "start": 4779,
+  "end": 4790,
+  "lines": 12,
+  "sha": "2fead316b1edb1174afc0194fd41788f0c669b1d502747ee5fac7dfa43b34a0d"
+ },
+ {
+  "name": "savePdfLayout",
+  "kind": "function",
+  "start": 4791,
+  "end": 4798,
+  "lines": 8,
+  "sha": "ba0accd2dd18b4df8c340db893c8233aaaf4bff2b3911b2954a2b2c84f03975e"
+ },
+ {
+  "name": "loadThemeMode",
+  "kind": "function",
+  "start": 4799,
+  "end": 4807,
+  "lines": 9,
+  "sha": "16eb18849c740985e9b28b1a3ff96380b63d1a23d3d9f309d5f4701b0f34092b"
+ },
+ {
+  "name": "loadUserThemes",
+  "kind": "function",
+  "start": 4808,
+  "end": 4826,
+  "lines": 19,
+  "sha": "130f810b6f8adafea8e2204cf44a4619ef31f9836b88b8b88f7b42fee4c880f7"
+ },
+ {
+  "name": "saveUserThemes",
+  "kind": "function",
+  "start": 4827,
+  "end": 4834,
+  "lines": 8,
+  "sha": "f4879dc4f2fb5b1369338bb8f573d42f21f3fb50b9343e4395b2acbb3d86ef15"
+ },
+ {
+  "name": "renderThemePresets",
+  "kind": "function",
+  "start": 4835,
+  "end": 4850,
+  "lines": 16,
+  "sha": "9e3464fd568f58923c6faab3afc03d1e0b7916b98f820a5aa6ba165f0cc3dff8"
+ },
+ {
+  "name": "loadSettings",
+  "kind": "function",
+  "start": 4851,
+  "end": 4867,
+  "lines": 17,
+  "sha": "eee0777d92f5d42a553d9d19fc722efd0e057cf42c551ee335725c0c15db2391"
+ },
+ {
+  "name": "saveSettings",
+  "kind": "function",
+  "start": 4868,
+  "end": 4875,
+  "lines": 8,
+  "sha": "6fb2e9820eb2be741b504fa2683597607169e79a9841eecdd4b1a4dd848bae7b"
+ },
+ {
+  "name": "applySettings",
+  "kind": "function",
+  "start": 4876,
+  "end": 4882,
+  "lines": 7,
+  "sha": "2e93e6dbac7677c74c468ee368c7e1190b789a8da4150f71fba2cf7c2b049a75"
+ },
+ {
+  "name": "renderSettingsEditor",
+  "kind": "function",
+  "start": 4883,
+  "end": 4892,
+  "lines": 10,
+  "sha": "a07358975dbfdd9dbc621a8b3385936f6a91303f7b119d50343259b340d53491"
+ },
+ {
+  "name": "setTheme",
+  "kind": "function",
+  "start": 4893,
+  "end": 4910,
+  "lines": 18,
+  "sha": "7c6490b9619cc75bfd0f4425b506a12caaa8b0f2f3071c61504f9cd51890187a"
+ },
+ {
+  "name": "saveCurrentTheme",
+  "kind": "function",
+  "start": 4911,
+  "end": 4934,
+  "lines": 24,
+  "sha": "dde5d2b99648261c9c296b4794bf7ca9507343acf10abc82784b1e7810628964"
+ },
+ {
+  "name": "renderColorEditor",
+  "kind": "function",
+  "start": 4935,
+  "end": 4951,
+  "lines": 17,
+  "sha": "98b7c89b7b8e6c3960096b1dec673bbae832aec5111ec7e96a9dec8908efb791"
+ },
+ {
+  "name": "renderThemeEditor",
+  "kind": "function",
+  "start": 4952,
+  "end": 4960,
+  "lines": 9,
+  "sha": "145571d49cdcfe9764d2c610c6c0a91237cfbd359f24a633c5c1618c496f5e39"
+ },
+ {
+  "name": "renderPdfThemeEditor",
+  "kind": "function",
+  "start": 4961,
+  "end": 4966,
+  "lines": 6,
+  "sha": "81bfffa0b1be2cec926b462db5de54cd492c211f6a5e54075457aee4ab708528"
+ },
+ {
+  "name": "renderPdfLayoutEditor",
+  "kind": "function",
+  "start": 4967,
+  "end": 4992,
+  "lines": 26,
+  "sha": "8faa0994a4c979a5e7b9f0c3877f56ec42fd0adb238d26c727d7e9d944e98781"
+ },
+ {
+  "name": "applyPdfLayoutEditor",
+  "kind": "function",
+  "start": 4993,
+  "end": 5010,
+  "lines": 18,
+  "sha": "db42b47209f054ca448995f5e5c6a92a55788ab083f2cf3c3c04c64bb213efd3"
+ },
+ {
+  "name": "PDF_PREVIEW_SAMPLE",
+  "kind": "decl",
+  "start": 5011,
+  "end": 5038,
+  "lines": 28,
+  "sha": "0d98bdf4a439b6514f0e17849b013341d512635ff64d1cf4f815c9edb9e850df"
+ },
+ {
+  "name": "buildPdfPreviewBody",
+  "kind": "function",
+  "start": 5039,
+  "end": 5057,
+  "lines": 19,
+  "sha": "093574f55c96f0c9ac7b37251d179f275d1f3b7ffda26ec6f2328fc84befc279"
+ },
+ {
+  "name": "refreshPdfPreview",
+  "kind": "function",
+  "start": 5058,
+  "end": 5067,
+  "lines": 10,
+  "sha": "28ebad084855a417dfe5e31205c0d6a191c09f4fc774fc3b20a412139e79d6a7"
+ },
+ {
+  "name": "refreshPdfPreviewDebounced",
+  "kind": "decl",
+  "start": 5068,
+  "end": 5069,
+  "lines": 2,
+  "sha": "6f5779b7c26289287dc0ccd3f0d9fef2d07e6160675d00dd3d9df6b117627aee"
+ },
+ {
+  "name": "pdfPreviewObjectUrl",
+  "kind": "decl",
+  "start": 5070,
+  "end": 5072,
+  "lines": 3,
+  "sha": "15e2caefdb5f5ed4da65b5b5f30c9d6e5488537af9e77dfdba3c72d629cedee1"
+ },
+ {
+  "name": "openPdfPreviewModal",
+  "kind": "function",
+  "start": 5073,
+  "end": 5081,
+  "lines": 9,
+  "sha": "54432f8657fb376661c68cd83bd101685f6199e46228d7c40ba4e84083ef6cba"
+ },
+ {
+  "name": "closePdfPreviewModal",
+  "kind": "function",
+  "start": 5082,
+  "end": 5093,
+  "lines": 12,
+  "sha": "6cb974d75f4e95303255addc373d51fe9386dd7f4226bed4826355c6d08f9682"
+ },
+ {
+  "name": "openImageLightbox",
+  "kind": "function",
+  "start": 5094,
+  "end": 5107,
+  "lines": 14,
+  "sha": "d89d89dee61133da1d0dece2e28ccad08d3f52d2466a042cec3201e638e8e571"
+ },
+ {
+  "name": "closeImageLightbox",
+  "kind": "function",
+  "start": 5108,
+  "end": 5119,
+  "lines": 12,
+  "sha": "2235ffd5ed1ebacdaea25af2b6e301e0fab07cded7d206572941fe641cee3734"
+ },
+ {
+  "name": "generatePdfPreview",
+  "kind": "function",
+  "start": 5120,
+  "end": 5161,
+  "lines": 42,
+  "sha": "455f5becf919a33f37e02e3e884f92d250f3986eabc141d76745dd15606553ca"
+ },
+ {
+  "name": "readColorEditor",
+  "kind": "function",
+  "start": 5162,
+  "end": 5173,
+  "lines": 12,
+  "sha": "18b74e8cd8ec2d5b04d59217b123e6f23d52de395dfc9b9cd508b7c3a7fc2d74"
+ },
+ {
+  "name": "setThemeMode",
+  "kind": "function",
+  "start": 5174,
+  "end": 5192,
+  "lines": 19,
+  "sha": "fc94018398508006bea89f3b97e5547148938aa54fbc9c34f3809862204d4cfe"
+ },
+ {
+  "name": "toHex",
+  "kind": "function",
+  "start": 5193,
+  "end": 5198,
+  "lines": 6,
+  "sha": "c7868d0baa59ba3c3823e9ba39815ba6169eb5cf1b6c48eec8ca15e8d2417f56"
+ },
+ {
+  "name": "openDrawer",
+  "kind": "function",
+  "start": 5199,
+  "end": 5207,
+  "lines": 9,
+  "sha": "4b1b23876f1c52b0ce8546c0342b7e7231faea14ada727472a0723d6044c7da1"
+ },
+ {
+  "name": "closeDrawer",
+  "kind": "function",
+  "start": 5208,
+  "end": 5212,
+  "lines": 5,
+  "sha": "8dc099e4f2bd8169b004bdefa35d2dfc6a00c881ce3b278d46574e30e59df1c5"
+ },
+ {
+  "name": "openSingleFile",
+  "kind": "function",
+  "start": 5213,
+  "end": 5250,
+  "lines": 38,
+  "sha": "c3115be1508a61a2809df4d55fdaad0cf8b193d79f5249b29ef5deb18665548f"
+ },
+ {
+  "name": "bindEvents",
+  "kind": "function",
+  "start": 5251,
+  "end": 6673,
+  "lines": 1423,
+  "sha": "30106ee297cbbc8265792addf7af3c9a8b1a778d3de2feaadbadde9b2e534477"
+ },
+ {
+  "name": "restoreTheme",
+  "kind": "function",
+  "start": 6674,
+  "end": 6699,
+  "lines": 26,
+  "sha": "80328ec9e93ee7486a0b7318c84296737c4a77b31b183659cc741b6503606e99"
+ },
+ {
+  "name": "init",
+  "kind": "function",
+  "start": 6700,
+  "end": 6726,
+  "lines": 27,
+  "sha": "48efd2f8d3f5a6d513abf6717dc692a06df54869bd15d887ff82e0c816b4b354"
+ }
+]

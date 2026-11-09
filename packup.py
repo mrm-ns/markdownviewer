@@ -28,6 +28,8 @@ ROOT_FILES = [
     'serve.py',
     'start.bat',
     'start.sh',
+    'setup-env.bat',
+    'setup-env.ps1',
 ]
 
 # 需要整体打包的目录（递归包含其下所有文件）
