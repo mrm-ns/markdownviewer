@@ -1432,7 +1432,7 @@
       '.markdown-body table th { font-weight: 600; background: var(--inline-code-bg); }',
       '.markdown-body table tr:nth-child(2n) { background: var(--inline-code-bg); }',
       '.markdown-body hr { height: 2px; margin: 24px 0; background: var(--toolbar-border); border: none; }',
-      '.markdown-body img { max-width: 100%; height: auto; border-radius: 4px; background-color: ' + (state.settings.imageBackground ? state.settings.imageBackgroundColor : 'transparent') + '; padding: ' + (state.settings.imageBackground ? '6px' : '0px') + '; box-sizing: content-box; }',
+      '.markdown-body img { max-width: 100%; height: auto; background-color: ' + (state.settings.imageBackground ? state.settings.imageBackgroundColor : 'transparent') + '; box-sizing: content-box; }',
       '.markdown-body :not(pre) > code { background: var(--md-inlineCodeBackground); color: var(--md-codeText); padding: 2px 6px; border-radius: 4px; font-size: ' + state.settings.inlineCodeSize + 'px; }',
       '.markdown-body pre { background: var(--md-codeBackground); color: var(--md-codeText); padding: 16px; border-radius: 6px; overflow-x: auto; margin-bottom: 16px; font-size: ' + state.settings.codeSize + 'px; line-height: 1.45; }',
       '.markdown-body pre code { background: transparent; padding: 0; font-size: inherit; color: inherit; }'
@@ -5011,8 +5011,9 @@
     root.style.setProperty('--md-image-bg', state.settings.imageBackground
       ? state.settings.imageBackgroundColor
       : 'transparent');
-    // 铺底时给图片留出内边距，否则图片紧贴边缘、圆角看不出来
-    root.style.setProperty('--md-image-padding', state.settings.imageBackground ? '6px' : '0px');
+    // 背景必须与图片**完全贴合**：留内边距会像「相框把图片包起来」，
+    // 所以这里恒为 0（保留变量是为了样式表里有一处可覆盖的入口）。
+    root.style.setProperty('--md-image-padding', '0px');
   }
 
   function renderSettingsEditor() {
@@ -6986,7 +6987,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.01)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.02)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

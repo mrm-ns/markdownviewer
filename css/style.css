@@ -741,20 +741,14 @@ body.sidebar-collapsed .sidebar {
   box-shadow: var(--shadow);
 }
 
-/* 兜底：窗口太矮时主菜单高度随内容变化（菜单项数不同，最多约 200px），
-   允许滚动，避免下半部分（尤其是最底部的「删除」）被窗口下沿裁掉。
-   正常窗口下菜单远达不到这个高度，不会出现滚动条；
-   配合 JS 的 clampMenuIntoViewport 一起用（见 60-ui-init.js）。
+/* 注意：主菜单**不能**加 overflow（哪怕是 overflow-y:auto）或 max-height。
+   二级菜单（.context-submenu）是主菜单的【后代】节点，绝对定位向右展开；
+   一旦主菜单成为溢出容器，子菜单就会被它裁剪 —— 表现为「二级菜单不弹出，
+   只看到主菜单出现滚动条」（用户报告的 bug，v1.1.0 引入 overflow 时踩到）。
 
-   注意：只加在「正文右键主菜单」上，不能用 .context-menu 通配 ——
-   .context-submenu（二级菜单）复用了 .context-menu 的类名，
-   而它是 position:absolute 向父级右侧展开的，给父级加 overflow 会把子菜单裁掉。
-   这里用 id 限定到主菜单节点上。 */
-#content-context-menu {
-  max-height: calc(100vh - 16px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
+   「文档靠下处右键、底部菜单项被窗口下沿裁掉」那个问题由 JS 解决，不靠 CSS：
+   clampMenuIntoViewport() 量出菜单真实高度后整体上移、贴住视口底边
+   （见 60-ui-init.js）。所以这里保持默认的 overflow:visible 即可。 */
 
 .context-menu[hidden] {
   display: none;
@@ -1118,11 +1112,12 @@ body.sidebar-collapsed .sidebar {
   box-sizing: content-box;
   /* 图片背景：透明 PNG / SVG（截图、流程图、公式图）在暗色主题下没有底板会看不清，
      所以默认铺一层白底（--md-image-bg，由「主题 → 阅读设置」控制，可改色或关闭）。
-     背景画在 padding 区域且 box-sizing 为 content-box，所以图片不会被拉伸变形；
-     关掉时 --md-image-bg 为 transparent、padding 为 0，外观与改动前完全一致。 */
+     背景**紧贴图片边缘**（padding 为 0），只补一层底板、不加边框感 ——
+     最初留 6px 内边距时看起来像「相框把图片包起来」，已按反馈去掉。
+     关掉时 --md-image-bg 为 transparent，外观与改动前完全一致。 */
   background-color: var(--md-image-bg, transparent);
   padding: var(--md-image-padding, 0px);
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 .markdown-body :not(pre) > code {

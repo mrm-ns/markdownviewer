@@ -568,35 +568,64 @@ function bindEvents() {
 脚本改完片段会**自动调用 `node tools/split_app.js --bundle` 重新拼接**，
 再校验 `js/app.js` 与 `index.html` 的版本号一致。不需要手工拼接。
 
-### 6.9 右键菜单必须按「实测高度」夹进视口，不能写死常数
+### 6.9 右键菜单必须按「实测高度」夹进视口，且主菜单绝不能加 overflow
 
-**问题（用户报告）**：在文档靠下的位置右键，菜单底部的「🗑️ 删除」被窗口下沿遮住、点不到。
+**问题（用户报告）**：`showContentCtxMenu` 原先按写死的
+`top: Math.min(y, window.innerHeight - 120)` 摆放菜单，导致在文档靠下的位置右键时，
+底部的「删除」被窗口下沿遮住、点不到。
 
-**根因**：`showContentCtxMenu` 里写死了 `top: Math.min(y, window.innerHeight - 120)`。
-这个 `120` 是按**早期只有 3 个菜单项**时估的；后来陆续加了「缩进」二级菜单和「删除」项，
-菜单实际高度涨到约 **200px**，于是 `innerHeight - 120` 的夹取量不够，底部溢出约 80px，
-**最下面的「删除」最先被裁掉**（菜单项越多，被裁的越是最下面那个）。
+**根因**：那个 `120` 是按**早期只有 3 项菜单**估的常数；后来加了「缩进」二级菜单
+与「删除」项，菜单变高，`innerHeight - 120` 不够，底部溢出约 80px，
+**最下面的「删除」最先被裁**（菜单项越多，被裁的越是最下面那个）。
 
 **修复**（`src/60-ui-init.js`）：新增 `clampMenuIntoViewport(menu, x, y)`，
-在 `document.body.appendChild(menu)` **之后**调用，用 `getBoundingClientRect()` 量真实宽高再定位：
+在 `document.body.appendChild(menu)` **之后**调用（未挂载的节点量到的高度是 0），
+用 `getBoundingClientRect()` 量出菜单**真实高度**再决定摆放：
 
-1. 默认在光标下方展开（`top = y`）；
-2. 下方放不下 → 整体上移，让菜单底边贴住视口底部；
-3. 上移后若顶边越出视口（菜单比视口还高）→ 夹到 `margin`（8px），
-   保证菜单顶部可见、上面的菜单项仍可点，**而不是让菜单整体跑到屏幕外**；
-4. 横向同理：右边放不下先翻到光标左侧，仍放不下再贴左（与系统右键菜单一致）。
+1. 默认在光标下方（`top = y`）；
+2. 下方放不下就整体上移，让菜单底边贴住视口底部（`top = vh - h - margin`）；
+3. 上移后顶边仍越过视口（菜单比视口还高）→ 夹到 `margin`，保证至少能看到顶部；
+4. 横向同理：右边放不下先翻到光标左侧，仍放不下则贴左边。
 
-**两个必须记住的细节**：
+**关键：这个问题完全由 JS 解决，不要再用 CSS 兜底** —— 见 §6.9b。
 
-- **位置校正必须在插入 DOM 之后做**：未挂载的节点 `getBoundingClientRect()` 全为 0，
-  在那里量高度会得到 0，等于没夹。
-- **CSS 的 `max-height` / `overflow-y` 只能加在 `#content-context-menu` 上，不能加在 `.context-menu` 上**：
-  二级菜单 `.context-submenu` **复用了 `.context-menu` 类名**，而它是 `position:absolute`
-  向父级右侧展开的 —— 给 `.context-menu` 通配加 `overflow` 会把二级菜单直接裁掉。
+### 6.9b ⚠️ 给容器加 overflow 前，先查后代里有没有要「溢出显示」的元素
 
-CSS 侧另加了一道兜底：`#content-context-menu { max-height: calc(100vh - 16px); overflow-y: auto; }`。
-两层配合的关系是：**CSS 保证菜单高度不超过视口（超出则菜单内部滚动），
-JS 用「受限后的真实高度」算位置**，所以不会算出负的 `top`，极端小窗下滚动菜单内部仍能点到「删除」。
+**问题（用户报告）**：右键正文的**二级菜单**（「⇥ 缩进」「➕ 插入」）不弹出，
+只看到主菜单出现滚动条。
+
+**根因**：修 §6.9 时，为「高度兜底」给主菜单加了
+`#content-context-menu { max-height: calc(100vh - 16px); overflow-y: auto; }`。
+但**二级菜单是主菜单的后代节点**：
+
+```
+#content-context-menu          ← 加了 overflow-y:auto，成了溢出容器
+  └ .context-submenu-wrap      ← position: relative
+      ├ .ctx-submenu-trigger
+      └ .context-submenu       ← position: absolute; left: 100% 向右展开
+```
+
+主菜单一旦成为溢出容器，**向右展开的子菜单就被它裁剪掉了**；
+被裁后只剩一条缝，`overflow-y: auto` 又把这点内容当成纵向溢出、画出滚动条
+—— 这就是「子菜单不弹出、反而出现滚动条」的成因。
+
+**修复**：**删掉那条 CSS**。「低处右键被遮挡」本来就由 JS 的
+`clampMenuIntoViewport()` 解决（上移到贴底，根本没有超出视口的机会），
+CSS 兜底多余且有害。
+
+**通用规则**：给任何容器加 `overflow` / `max-height` / `contain` / `transform` /
+`filter` 之前，**先确认它的后代里有没有依赖「溢出可见」的绝对定位元素**
+（下拉菜单、二级菜单、悬浮卡、tooltip）。这类元素「相对哪个祖先定位」与
+「被哪个祖先裁剪」是两件事：定位找最近的**定位**祖先，
+裁剪却由最近的**溢出**容器决定，两者常常不是同一个节点。
+
+**同类教训**（都是「改共享基础设施时没检查其他使用者」）：
+
+| 版本 | 改动 | 波及 |
+|---|---|---|
+| v1.1.0 | 复用 `hasBlockTarget` 当「删除」判据 | 非 Markdown 文件的「复制/编辑」一起消失（§6.10） |
+| v1.1.0 | `bindEvents` 拆成多个 `bind*` 子函数 | `closeExportMenu` 被埋进子函数，顶层调用报 ReferenceError（§6.13） |
+| v1.1.0 | 给主菜单加 `overflow-y: auto` | 二级菜单被裁切，无法弹出（§6.9b，v1.1.02 修复） |
 
 ### 6.10 `hasBlockTarget` 与 `canDelete` 必须分开传（踩过回归）
 
@@ -790,11 +819,13 @@ canDelete: canDeleteBlock,           // 是否允许删除（独立判据）
 
 **关键细节**：
 
-1. `box-sizing` 必须是 `content-box`（原本就是），背景画在 padding 区域，
-   **图片本身不会被拉伸变形**，只是多一圈底板；
+1. `box-sizing` 必须是 `content-box`（原本就是），**背景紧贴图片边缘、不加内边距**。
+   踩过：v1.1.01 最初留了 6px `padding`（想「让底板看得出来」），
+   用户反馈是「像相框把图片包起来」—— 需求是**只补一层底板**，不是加边框。
+   所以 `padding` 恒为 `0`、`border-radius` 为 `0`。
 2. 变量要带兜底 `var(--md-image-bg, transparent)`：
    即使 JS 没跑（如脚本报错），外观也与改动前完全一致，不会出错；
-3. 关闭时把变量设成 `transparent`、padding 设成 `0px`，
+3. 关闭时把变量设成 `transparent`，
    而不是去删 class —— 状态只有一处（变量），没有「css 类忘了摘」的中间态。
 
 **设置项要向后兼容**：老版本的 `localStorage` 里没有新字段，

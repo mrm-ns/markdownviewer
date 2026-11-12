@@ -244,8 +244,9 @@
     root.style.setProperty('--md-image-bg', state.settings.imageBackground
       ? state.settings.imageBackgroundColor
       : 'transparent');
-    // 铺底时给图片留出内边距，否则图片紧贴边缘、圆角看不出来
-    root.style.setProperty('--md-image-padding', state.settings.imageBackground ? '6px' : '0px');
+    // 背景必须与图片**完全贴合**：留内边距会像「相框把图片包起来」，
+    // 所以这里恒为 0（保留变量是为了样式表里有一处可覆盖的入口）。
+    root.style.setProperty('--md-image-padding', '0px');
   }
 
   function renderSettingsEditor() {
