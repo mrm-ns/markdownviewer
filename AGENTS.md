@@ -325,6 +325,35 @@ PDF 主题 = **配色**（`state.pdfColors`，含语法色）+ **版式**（`sta
    一律经 `normalizePdfLayout()` 夹取。
 4. **标题缩放不要在 CSS 里用 `calc()`**，在 JS 里算好 `em` 乘积再写出去（prince 对 calc 的支持不可依赖）。
 
+### 6.17 YAML 占位符 `<变量>`：与 bash 用同一条规则
+
+**需求**：YAML 代码块里把 `<变量>` 识别为变量，颜色和 bash 一样。
+
+**结论**：颜色「一样」不是指换一套配色，而是**用同一个 `className`**。
+两者都输出 `hljs-variable`，CSS 里统一映射到 `var(--md-variable)`，
+所以主题换色时两处自动同步，不需要在 YAML 侧写任何颜色。
+
+**规则**（`js/yaml.js`，与 `js/bash.js` 里那条完全一致，两处要一起改）：
+
+```js
+{ className: 'variable', pattern: /(?<=<)[^\s<>]+(?=>)/ }
+```
+
+**为什么内容限定「不含空白」**：若允许空白，`cond: a < b` 这类比较写法里
+两个尖括号之间的整段文本会被当成变量染色，误伤远大于收益。
+
+**实测确认不受影响的 YAML 写法**（`cond: a < b`、块标量 `key: >` / `key: >-` / `key: |`、
+合并键 `<<: *default`、注释行 `# ...`）—— 要么「尖括号紧跟非空白」、
+要么「没有成对的尖括号」、要么注释优先，都不会误匹配。
+
+**已知代价**：值里写 XML 片段（`html: <b>粗体</b>`）会把标签名 `b`、`/b` 染成变量色。
+整段仍可读，且 YAML 里直接内嵌 XML 属少见写法，取舍上可接受。
+
+**改这个文件要动哪里**：只改 `js/yaml.js`。`js/*.js` 是**独立模块**，
+由根目录 `app.js` 的 `CONFIG_FILES` 动态加载（详见 §5），
+不属于 `js/app.js` 的拆分范围（`tools/split_app.js` 的 `LANG_FILES` 专门排除了它们），
+所以**不需要**重新拼接 `js/app.js`，也不用改 `css/style.css`。
+
 ### 6.16 PDF 水印 logo：只印第一页，用 absolute 不用 fixed
 
 **需求**：PDF 第一页右上角印项目 logo（`hutao.jpg`）。
