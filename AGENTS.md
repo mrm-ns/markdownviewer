@@ -354,36 +354,68 @@ PDF 主题 = **配色**（`state.pdfColors`，含语法色）+ **版式**（`sta
 不属于 `js/app.js` 的拆分范围（`tools/split_app.js` 的 `LANG_FILES` 专门排除了它们），
 所以**不需要**重新拼接 `js/app.js`，也不用改 `css/style.css`。
 
-### 6.16 PDF 水印 logo：只印第一页，用 absolute 不用 fixed
+### 6.16 PDF 水印 logo：只印第一页，落在右上留白区
 
-**需求**：PDF 第一页右上角印项目 logo（`hutao.jpg`）。
+**需求**：PDF 第一页右上角印项目 logo（`hutao.jpg`），且要落在**页边距留白区**里、不压正文。
 
 **做法**：`buildPdfDocumentHtml()` 在 `<body>` 里、`.markdown-body` **之前**插入
-`<div class="pdf-logo"><img src="data:..."></div>`，样式：
+`<div class="pdf-logo"><img src="data:..."></div>`。
+
+关键 CSS 是**两处配合**（只写一处都不会对）：
 
 ```css
-.pdf-logo     { position: absolute; top: -20mm; right: -18mm; }  /* 值 = @page 页边距 */
+/* body 的 padding 取与 @page 相同的页边距，并成为定位包含块 */
+body { margin: 0; padding: <marginV>mm <marginH>mm; position: relative; box-sizing: border-box; }
+
+/* logo 用小的正偏移，就落在 padding 之外、页边距留白之内 */
+.pdf-logo     { position: absolute; top: 2mm; right: 0; }
 .pdf-logo img { width: 14mm; height: auto; display: block; }
 ```
 
-**四个关键点（都是踩过或想清楚才定的）**：
+**为什么必须给 body 加 padding**：只写 `position:absolute; top:0; right:0` 时，
+包含块是**正文内容区**，logo 会压在正文上。
+把 `body` 的 padding 设成与 `@page` 相同的页边距后，body 的 padding-box 边缘
+正好是「内容区/留白区」的分界线，logo 用 `right:0` 就贴在这条线上、
+整块都在右侧留白里 —— 既不压正文，又没跑出纸张。
+
+**五个关键点**：
 
 1. **必须 `absolute`，绝不能 `fixed`** —— `fixed` 在分页媒体里会在**每一页**重复。
-   绝对定位元素相对「首页内容框」定位，天然只落在第一页。
-2. **负的 `top` / `right` 用来把 logo 推进 `@page` 页边距区域**，
-   这样它落在右上角留白里，**不占正文位置**（绝对定位也脱离文档流）。
-   值直接取 `L.marginV` / `L.marginH`，所以用户在 PDF 版式里改页边距时，logo 会跟着对齐。
-3. **logo 必须内联成 data URL**：导出时 HTML 会写到临时文件、以 `file://` 打开，
+   绝对定位元素相对首页内容框定位，天然只落在第一页。
+2. **`right` 取 `0`，`top` 取小的正值（2mm）。**
+   实测数据（A4 + 20mm/18mm 页边距，1mm ≈ 3.78px，内容区右边界 x=726）：
+   | `right` | logo 左边缘 | 结果 |
+   |---------|------------|------|
+   | `0` | x=726 | ✓ 正好在留白区 |
+   | `1mm` | x=722 | ✗ 压正文 |
+   | `2mm` | x=719 | ✗ 压正文 |
+   `top: 2mm` 是为了避开打印机通常存在的不可打印边缘。
+3. **绝不能用负偏移。** 这是 v1.1.04→v1.1.06 连踩两次的坑：
+   写 `top: -20mm; right: -18mm` 想「把 logo 推出去」，实测**logo 被整块推到纸张之外，完全看不见**。
+   连 `top:-14mm` 都会让它完全消失。**负偏移在 Chromium 打印里不会把它推进留白，只会推出纸外。**
+4. **logo 必须内联成 data URL**：导出时 HTML 会写到临时文件、以 `file://` 打开，
    相对路径 `hutao.jpg` 在那种上下文里取不到。处理方式与正文图片一致
    （正文走 `inlineImagesForExport`，logo 走 `loadPdfLogo`）。
-4. **必须优雅降级**：`file://` 下 `fetch` 会被浏览器拦截。
-   读不到就**不印水印**（回调 `null`），绝不能抛错或阻断导出 ——
-   导出 PDF 本来就需要本地服务器，但降级路径仍然要通。
+5. **必须优雅降级**：`file://` 下 `fetch` 会被浏览器拦截。
+   读不到就**不印水印**（回调 `null`），绝不能抛错或阻断导出。
 
-**为什么要缩放**：原图 1022×1022 / 127KB，base64 后 169KB，
-而水印只显示 14mm（96dpi 下约 53px）。用 canvas 在浏览器里实时缩到 200×200
-（300dpi 印刷也够），base64 降到约 1/8 —— **不引入构建步骤或依赖**，
-双击 `index.html` 仍然可用。这是本项目一贯的取舍：能在运行时算出来的，就不预生成文件。
+**为什么要用预生成的小图**：原图 `hutao.jpg` 是 1022×1022 / 127KB，
+而水印只显示 14mm（96dpi 下约 53px，300dpi 约 165px）。
+直接内联原图会让每次导出多传 **169KB**（base64 膨胀 1.33 倍）。
+所以仓库里额外放了一张预缩好的 **`hutao-logo-300.jpg`（300×300 / 26KB）**：
+
+| 文件 | 尺寸 | 体积 | base64 |
+|------|------|------|--------|
+| `hutao.jpg`（原图，仍是应用图标等用途） | 1022×1022 | 127 KB | 169 KB |
+| `hutao-logo-300.jpg`（水印专用） | 300×300 | 26 KB | 34 KB |
+
+**体积降到 1/5**，且省掉了运行时的 canvas 缩放那一步。
+`loadPdfLogo` 优先读小图；万一小图缺失（用户误删）就回退到原图 + `downscaleLogoBlob`
+（该函数因此保留，不是死代码）。两条路径都失败则回调 `null` → 不印水印。
+
+**注意**：改 logo 素材时**两个文件都要更新**（原图 + 小图），否则水印和图标会不一致。
+小图可以用系统自带工具重新生成，例如 PowerShell + System.Drawing 缩到 300×300、
+JPEG 质量 90 —— 不要引入构建步骤或 npm 依赖。
 
 **三处调用点都要带 logo**：导出 PDF（`exportCurrentPdf`）、
 抽屉内即时预览（`refreshPdfPreview`）、弹层真实预览（`generatePdfPreview`），
@@ -391,6 +423,13 @@ PDF 主题 = **配色**（`state.pdfColors`，含语法色）+ **版式**（`sta
 
 **水印只加在 PDF 路径**：导出的 HTML（`exportCurrentHtml`）不含水印，
 阅读界面也不显示 —— 它是 PDF 的品牌标记，不是页面内容。
+
+**怎么验证**：这类「元素到底出现在哪、有没有压到正文」的问题，静态检查查不出来，必须真渲染。
+可靠做法是**渲染两份做像素级相减**：一份带 logo、一份删除 logo 节点，
+逐像素求差，差异区域就是 logo 的精确包围盒；再拿包围盒和内容区边界比。
+不要靠肉眼看截图，也不要只看 CSS 是否符合预期 ——
+v1.1.05 就是「CSS 看起来完全正确、元素实际在纸张外或压着正文」。
+（本项目默认不做浏览器实测；只有用户明确要求时才渲染验证，见 §7。）
 
 **PDF 引擎：用系统自带的 Edge / Chrome，不要用 Prince（v1.1.03 起）**
 

@@ -192,28 +192,59 @@
   //   导出时 PDF 的 HTML 会写到临时文件、以 file:// 打开，相对路径 `hutao.jpg`
   //   在那种上下文里取不到；内联后文档完全自包含（与正文图片 inlineImagesForExport 同理）。
   //
-  // 为什么还要用 canvas 缩小：
-  //   hutao.jpg 是 1022x1022 / 127KB，而水印只显示 14mm 宽（96dpi 下约 53px）。
-  //   直接内联会让每次导出多传 169KB（base64 后膨胀 1.33 倍）。
-  //   这里缩到 200x200 —— 14mm 在 300dpi 印刷下也只需约 160px，200px 足够清晰，
-  //   而 base64 体积降到约 1/8。缩放在浏览器里做，不需要任何构建步骤或额外依赖。
+  // 为什么用预生成的小图 hutao-logo-300.jpg 而不是原图 hutao.jpg：
+  //   水印只显示 14mm 宽，原图却是 1022x1022 / 127KB，base64 后 169KB。
+  //   每次导出都要读它、再在浏览器里用 canvas 缩放，纯属浪费。
+  //   hutao-logo-300.jpg 是预先缩好的 300x300 / 26KB（base64 约 34KB），
+  //   体积只有原图的 1/5，且 300px 覆盖 14mm@300dpi（约 165px）还留了余量。
+  //   有了它，运行时只需一次 FileReader，不再需要 canvas 缩放那一步。
+  //
+  // 为什么还保留 canvas 缩放分支：
+  //   万一小图缺失（用户误删），回退到原图时仍然需要缩放，
+  //   所以 downscaleLogoBlob 保留下来作为回退路径，而不是直接删掉。
   var _pdfLogoDataUrl = null;   // 成功读到后缓存，避免每次导出都重新读一遍
-  var PDF_LOGO_MAX_PX = 200;
+  var PDF_LOGO_SRC = 'hutao-logo-300.jpg';   // 预生成的小图（首选）
+  var PDF_LOGO_SRC_FULL = 'hutao.jpg';       // 原图（小图读不到时的回退）
+  var PDF_LOGO_MAX_PX = 300;                 // 回退缩放时的最长边上限
 
   function loadPdfLogo(callback) {
     if (_pdfLogoDataUrl) { callback(_pdfLogoDataUrl); return; }
     // file:// 下 fetch 本地文件会被浏览器拦截，此时优雅降级为「不印水印」，
     // 而不是让整个导出失败（导出 PDF 本来就需要走本地服务器）
-    fetch('hutao.jpg')
-      .then(function (resp) { return resp.ok ? resp.blob() : null; })
+    function fetchAsBlob(url) {
+      return fetch(url).then(function (resp) { return resp.ok ? resp.blob() : null; });
+    }
+    fetchAsBlob(PDF_LOGO_SRC)
       .then(function (blob) {
-        if (!blob) { callback(null); return; }
-        downscaleLogoBlob(blob, function (dataUrl) {
-          if (dataUrl) _pdfLogoDataUrl = dataUrl;
-          callback(dataUrl);
+        if (blob) {
+          // 小图已经够小，只需转成 data URL，不必再缩放
+          return new Promise(function (resolve) { blobToDataUrl(blob, resolve); });
+        }
+        // 小图不在（例如用了旧版本留下的文件），回退到原图 + canvas 缩放
+        return fetchAsBlob(PDF_LOGO_SRC_FULL).then(function (fullBlob) {
+          if (!fullBlob) return null;
+          return new Promise(function (resolve) {
+            downscaleLogoBlob(fullBlob, resolve);
+          });
         });
       })
+      .then(function (dataUrl) {
+        if (dataUrl && /^data:image\//.test(dataUrl)) _pdfLogoDataUrl = dataUrl;
+        callback(dataUrl || null);
+      })
       .catch(function () { callback(null); });
+  }
+
+  // Blob → data URL。任何失败都回调 null（调用方会降级为「不印水印」）。
+  function blobToDataUrl(blob, callback) {
+    try {
+      var reader = new FileReader();
+      reader.onload = function () { callback(reader.result); };
+      reader.onerror = function () { callback(null); };
+      reader.readAsDataURL(blob);
+    } catch (e) {
+      callback(null);
+    }
   }
 
   // 把 logo 等比缩到最长边 PDF_LOGO_MAX_PX 并转成 data URL。
@@ -376,7 +407,10 @@
 
     const bodyStyles = [
       '@page { size: ' + L.pageSize + '; margin: ' + L.marginV + 'mm ' + L.marginH + 'mm; }',
-      'body { margin: 0; padding: 0; background: ' + C.pdfPageBg + '; color: ' + C.pdfText + '; }',
+      // body 的 padding 取与 @page 相同的页边距，并在下面用 padding-box 定位 logo：
+      // 这样 body 的「外边缘」正好落在纸张的页边距分界线上，
+      // logo 用 top/right 正偏移就能稳稳落在留白区里（见 .pdf-logo 与 AGENTS.md §6.16）。
+      'body { margin: 0; padding: ' + L.marginV + 'mm ' + L.marginH + 'mm; background: ' + C.pdfPageBg + '; color: ' + C.pdfText + '; position: relative; box-sizing: border-box; }',
       '.markdown-body { max-width: 100%; margin: 0 auto; padding: 0; color: ' + C.pdfText + '; font-size: ' + L.textSize + 'px; line-height: ' + L.lineHeight + '; word-wrap: break-word; font-family: ' + bodyFont + '; }',
       '.markdown-body h1, .markdown-body h2 { padding-bottom: 0.3em; border-bottom: 1px solid ' + C.pdfBorder + '; }',
       '.markdown-body h1 { font-size: ' + scaled(2) + '; margin: 0.67em 0; color: ' + C.pdfHeading + '; }',
@@ -404,11 +438,17 @@
       /* 标题避免跨页 */
       'h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }',
       /* 第一页右上角的 logo 水印（见 buildPdfDocumentHtml）：
-         用 position:absolute 而**不是** fixed —— fixed 会在每一页重复。
+         用 position:absolute 而**不是** fixed —— fixed 会在每一页重复，
          绝对定位元素相对「首页内容框」定位，所以天然只出现在第一页。
-         取负的 top/right 是为了把 logo 推进 @page 的页边距区域里，
-         这样既落在右上角，又不占正文位置（绝对定位也脱离文档流，不影响排版）。 */
-      '.pdf-logo { position: absolute; top: -' + L.marginV + 'mm; right: -' + L.marginH + 'mm; }',
+
+         定位基准是 body 的 padding-box 边缘（body 有 position:relative，
+         且 padding 与 @page 页边距相同），所以 right:0 时 logo 的右边缘
+         正好落在正文区右边界上、整块都在右侧留白里，不压正文。
+
+         **不要**改用负值去「往外推」：实测（Chromium --print-to-pdf）
+         负偏移会把 logo 整块推到纸张之外、完全看不见（详见 AGENTS.md §6.16）。
+         top 用 2mm 是为了避开打印机通常存在的不可打印边缘。 */
+      '.pdf-logo { position: absolute; top: 2mm; right: 0; }',
       '.pdf-logo img { width: 14mm; height: auto; display: block; }'
     ].join('\n');
 

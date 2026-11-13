@@ -278,6 +278,11 @@ function cmdCheckAll() {
     /^\s{6}'h1, h2, h3, h4, h5, h6 \{ page-break-after: avoid; \}'$/,
     /^\s{2}\/\/ 完整独立 HTML 文档（导出给 prince 的/,
     /^\s{2}function buildPdfDocumentHtml\(bodyHtml, title, layout, colors\) \{$/,
+    // v1.1.06 水印 logo 定位修复：
+    //   - body 规则加 padding（= @page 页边距）+ position:relative + box-sizing，
+    //     让 logo 的定位基准落在「内容区/留白区」分界线上（见 AGENTS.md §6.16）
+    //   - .pdf-logo 的 top/right 由 0 改为 top:2mm right:0
+    /^\s{6}'body \{ margin: 0; padding: 0; background: ' \+ C\.pdfPageBg \+ '; color: ' \+ C\.pdfText \+ '; \}',$/,
   ];
   // 整函数重写的白名单：当一次修改是「整段重写」某个函数而不是改几行时，
   // 逐行白名单会膨胀到几十条、失去审计意义。这里按「函数体范围」放行：
