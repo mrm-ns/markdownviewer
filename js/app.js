@@ -1365,7 +1365,79 @@
   }
 
 
-  // 导出前把 blob:/相对路径 图片内联为 data URL，保证导出的 HTML/PDF 在任何位置都能显示图片
+  // ---------- PDF 水印 logo ----------
+  // 第一页右上角印项目 logo。
+  //
+  // 为什么在导出前把 logo 读成 data URL：
+  //   导出时 PDF 的 HTML 会写到临时文件、以 file:// 打开，相对路径 `hutao.jpg`
+  //   在那种上下文里取不到；内联后文档完全自包含（与正文图片 inlineImagesForExport 同理）。
+  //
+  // 为什么还要用 canvas 缩小：
+  //   hutao.jpg 是 1022x1022 / 127KB，而水印只显示 14mm 宽（96dpi 下约 53px）。
+  //   直接内联会让每次导出多传 169KB（base64 后膨胀 1.33 倍）。
+  //   这里缩到 200x200 —— 14mm 在 300dpi 印刷下也只需约 160px，200px 足够清晰，
+  //   而 base64 体积降到约 1/8。缩放在浏览器里做，不需要任何构建步骤或额外依赖。
+  var _pdfLogoDataUrl = null;   // 成功读到后缓存，避免每次导出都重新读一遍
+  var PDF_LOGO_MAX_PX = 200;
+
+  function loadPdfLogo(callback) {
+    if (_pdfLogoDataUrl) { callback(_pdfLogoDataUrl); return; }
+    // file:// 下 fetch 本地文件会被浏览器拦截，此时优雅降级为「不印水印」，
+    // 而不是让整个导出失败（导出 PDF 本来就需要走本地服务器）
+    fetch('hutao.jpg')
+      .then(function (resp) { return resp.ok ? resp.blob() : null; })
+      .then(function (blob) {
+        if (!blob) { callback(null); return; }
+        downscaleLogoBlob(blob, function (dataUrl) {
+          if (dataUrl) _pdfLogoDataUrl = dataUrl;
+          callback(dataUrl);
+        });
+      })
+      .catch(function () { callback(null); });
+  }
+
+  // 把 logo 等比缩到最长边 PDF_LOGO_MAX_PX 并转成 data URL。
+  // 任何一步失败都回退到「原图 data URL」；再失败则回调 null（不印水印），绝不阻断导出。
+  function downscaleLogoBlob(blob, callback) {
+    function toDataUrl(b, cb) {
+      var reader = new FileReader();
+      reader.onload = function () { cb(reader.result); };
+      reader.onerror = function () { cb(null); };
+      reader.readAsDataURL(b);
+    }
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function () {
+      try {
+        var w = img.naturalWidth || img.width;
+        var h = img.naturalHeight || img.height;
+        var scale = Math.min(1, PDF_LOGO_MAX_PX / Math.max(w, h));
+        var tw = Math.max(1, Math.round(w * scale));
+        var th = Math.max(1, Math.round(h * scale));
+        var canvas = document.createElement('canvas');
+        canvas.width = tw;
+        canvas.height = th;
+        var ctx = canvas.getContext && canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, tw, th);
+          // JPEG 有损但 logo 是插画类图片，q=0.9 肉眼无损；不支持 toDataURL 的极老环境会抛错
+          var out = canvas.toDataURL('image/jpeg', 0.9);
+          URL.revokeObjectURL(url);
+          if (out && /^data:image\//.test(out)) { callback(out); return; }
+        }
+      } catch (e) {
+        // 落到下面的原图回退
+      }
+      URL.revokeObjectURL(url);
+      toDataUrl(blob, callback);   // 回退：用未经缩放的原图
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      callback(null);
+    };
+    img.src = url;
+  }
+
   function inlineImagesForExport(container, callback) {
     const clone = container.cloneNode(true);
     const imgs = clone.querySelectorAll('img');
@@ -1509,8 +1581,15 @@
       '.markdown-body :not(pre) > code { background: ' + C.pdfInlineBg + '; color: ' + C.pdfInlineText + '; padding: 2px 6px; border-radius: 4px; font-size: ' + L.inlineCodeSize + 'px; }',
       '.markdown-body pre { background: ' + C.pdfCodeBg + '; color: ' + C.pdfCodeText + '; padding: 16px; border-radius: 6px; overflow-x: visible; margin-bottom: 16px; font-size: ' + L.codeSize + 'px; line-height: ' + L.codeLineHeight + '; font-family: ' + codeFont + '; white-space: pre-wrap; word-break: break-word; }',
       '.markdown-body pre code { background: transparent; padding: 0; font-size: inherit; color: inherit; }',
-      /* prince 专用：标题避免跨页 */
-      'h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }'
+      /* 标题避免跨页 */
+      'h1, h2, h3, h4, h5, h6 { page-break-after: avoid; }',
+      /* 第一页右上角的 logo 水印（见 buildPdfDocumentHtml）：
+         用 position:absolute 而**不是** fixed —— fixed 会在每一页重复。
+         绝对定位元素相对「首页内容框」定位，所以天然只出现在第一页。
+         取负的 top/right 是为了把 logo 推进 @page 的页边距区域里，
+         这样既落在右上角，又不占正文位置（绝对定位也脱离文档流，不影响排版）。 */
+      '.pdf-logo { position: absolute; top: -' + L.marginV + 'mm; right: -' + L.marginH + 'mm; }',
+      '.pdf-logo img { width: 14mm; height: auto; display: block; }'
     ].join('\n');
 
     const appVars = ':root {\n' +
@@ -1525,13 +1604,18 @@
     return appVars + '\n' + cssVars + '\n' + bodyStyles;
   }
 
-  // 完整独立 HTML 文档（导出给 prince 的、以及预览 iframe 里用的，是同一份构建结果）
-  function buildPdfDocumentHtml(bodyHtml, title, layout, colors) {
+  // 完整独立 HTML 文档（导出 PDF 的、以及预览 iframe 里用的，是同一份构建结果）
+  // logoDataUrl 为 null 时不加水印（例如 file:// 下读不到 logo 文件）
+  function buildPdfDocumentHtml(bodyHtml, title, layout, colors, logoDataUrl) {
+    const logoHtml = logoDataUrl
+      ? '<div class="pdf-logo"><img src="' + logoDataUrl + '" alt=""></div>\n'
+      : '';
     return '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n' +
       '<meta charset="UTF-8">\n' +
       '<title>' + escapeHtml(title) + '</title>\n' +
       '<style>\n' + buildPdfCss(layout, colors) + '\n</style>\n' +
       '</head>\n<body>\n' +
+      logoHtml +
       '<div class="markdown-body">\n' + bodyHtml + '\n</div>\n' +
       '</body>\n</html>';
   }
@@ -1550,40 +1634,43 @@
 
     // 先内联图片（blob/相对路径 → data URL），再构建完整 HTML 发送给 serve.py 转 PDF
     inlineImagesForExport(container, function (bodyHtml) {
-      // 版式取自 PDF 主题（state.pdfLayout），与阅读器字号 state.settings 无关
-      var html = buildPdfDocumentHtml(bodyHtml, title, state.pdfLayout, state.pdfColors);
+      // logo 也要先读成 data URL 才能随文档一起走（见 loadPdfLogo）
+      loadPdfLogo(function (logoDataUrl) {
+        // 版式取自 PDF 主题（state.pdfLayout），与阅读器字号 state.settings 无关
+        var html = buildPdfDocumentHtml(bodyHtml, title, state.pdfLayout, state.pdfColors, logoDataUrl);
 
-      toast('正在生成 PDF...');
+        toast('正在生成 PDF...');
 
-      fetch('/api/export-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        body: html
-      }).then(function (resp) {
-        if (!resp.ok) {
-          return resp.json().then(function (data) {
-            throw new Error(data.error || 'PDF 生成失败');
-          }).catch(function (e) {
-            if (e.message) throw e;
-            throw new Error('PDF 生成失败 (HTTP ' + resp.status + ')');
-          });
-        }
-        return resp.blob();
-      }).then(function (blob) {
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = title + '.pdf';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-        }, 0);
-        toast('已导出：' + title + '.pdf');
-      }).catch(function (err) {
-        console.error('[Markdown Viewer] PDF 导出失败', err);
-        toast('PDF 导出失败：' + err.message);
+        fetch('/api/export-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+          body: html
+        }).then(function (resp) {
+          if (!resp.ok) {
+            return resp.json().then(function (data) {
+              throw new Error(data.error || 'PDF 生成失败');
+            }).catch(function (e) {
+              if (e.message) throw e;
+              throw new Error('PDF 生成失败 (HTTP ' + resp.status + ')');
+            });
+          }
+          return resp.blob();
+        }).then(function (blob) {
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = title + '.pdf';
+          document.body.appendChild(a);
+          a.click();
+          setTimeout(function () {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }, 0);
+          toast('已导出：' + title + '.pdf');
+        }).catch(function (err) {
+          console.error('[Markdown Viewer] PDF 导出失败', err);
+          toast('PDF 导出失败：' + err.message);
+        });
       });
     });
   }
@@ -5202,7 +5289,10 @@
     const panel = document.getElementById('pdf-theme-panel');
     if (panel && panel.hidden) return;
     buildPdfPreviewBody(function (bodyHtml) {
-      frame.srcdoc = buildPdfDocumentHtml(bodyHtml, 'PDF 预览', state.pdfLayout, state.pdfColors);
+      // 抽屉内的即时预览同样带上水印 logo，保证「预览 = 导出」外观一致
+      loadPdfLogo(function (logoDataUrl) {
+        frame.srcdoc = buildPdfDocumentHtml(bodyHtml, 'PDF 预览', state.pdfLayout, state.pdfColors, logoDataUrl);
+      });
     });
   }
   const refreshPdfPreviewDebounced = debounce(refreshPdfPreview, 200);
@@ -5270,8 +5360,9 @@
     const status = document.getElementById('pdf-preview-status');
     const frame = document.getElementById('pdf-preview-frame-lg');
     buildPdfPreviewBody(function (bodyHtml) {
-      const html = buildPdfDocumentHtml(bodyHtml, 'PDF 预览', state.pdfLayout, state.pdfColors);
-      if (status) status.textContent = '正在生成…（prince 渲染通常需要 1–3 秒）';
+      loadPdfLogo(function (logoDataUrl) {
+      const html = buildPdfDocumentHtml(bodyHtml, 'PDF 预览', state.pdfLayout, state.pdfColors, logoDataUrl);
+      if (status) status.textContent = '正在生成…（浏览器渲染通常需要 1–3 秒）';
       fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -5295,6 +5386,7 @@
         console.error('[Markdown Viewer] PDF 预览失败', err);
         if (status) status.textContent = '生成失败：' + err.message;
         toast('PDF 预览失败：' + err.message);
+      });
       });
     });
   }
@@ -6987,7 +7079,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.03)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.04)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

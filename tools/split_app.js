@@ -214,16 +214,31 @@ function cmdCheckAll() {
 
   // 口径 B：原文件非空行必须是拼接结果的「顺序子序列」（允许新增结构行）
   console.log('  \u975E\u7A7A\u884C\u6570\u4E0D\u540C\uFF08' + a.length + ' \u2192 ' + b.length + '\uFF0C\u65B0\u589E ' + (b.length - a.length) + ' \u884C\uFF09\uFF0C\u6309\u300C\u539F\u5185\u5BB9\u5B8C\u6574\u4FDD\u7559\u300D\u6821\u9A8C\uFF1A');
+  // 匹配窗口：原先是写死的 60 行，太小 —— 一次改动若新增了超过 60 行的新代码
+  // （例如 v1.1.04 新增的水印 logo 区块），基线行就会落在窗口之外，匹配失败后不同步。
+  // 改为「产物比基线多出的行数 + 余量」。
+  const lookahead = Math.max(60, (b.length - a.length) + 200);
+  // 判定「某行是否真的消失了」时，用整篇 b 的集合来查，而不是只看窗口内 ——
+  // 否则一次「删除/改写了一行」会让指针错位，后面每一行都被误报为找不到
+  // （曾一次报出 3236 行，其中 98% 是错位误报）。
+  const bSet = new Set(b);
   let i = 0, j = 0;
   const unmatched = [];   // { line, srcIdx }：srcIdx 是该行在原始文件里的下标
   while (i < a.length && j < b.length) {
     if (a[i] === b[j]) { i++; j++; continue; }
     let k = j + 1, found = -1;
-    while (k < b.length && k < j + 60) { if (b[k] === a[i]) { found = k; break; } k++; }
-    if (found < 0) { unmatched.push({ line: a[i], srcIdx: i }); i++; }
-    else { j = found; }
+    while (k < b.length && k < j + lookahead) { if (b[k] === a[i]) { found = k; break; } k++; }
+    if (found < 0) {
+      // 窗口内找不到：只有在整篇产物里都没有这一行时，才算是「真的缺了」；
+      // 否则说明只是被后面的内容挤开了，靠指针同步纠正即可，不计入差异。
+      if (!bSet.has(a[i])) unmatched.push({ line: a[i], srcIdx: i });
+      i++;
+    } else { j = found; }
   }
-  while (i < a.length) { unmatched.push({ line: a[i], srcIdx: i }); i++; }
+  while (i < a.length) {
+    if (!bSet.has(a[i])) unmatched.push({ line: a[i], srcIdx: i });
+    i++;
+  }
   // 版本号行是唯一「允许被改写」的行（发布时必然要从旧版本号改成新版本号）。
   // 把它从差异里剔除，但要求「拼接结果里确实存在一行同结构的版本号行」。
   const isVersionLine = function (l) { return /离线渲染器已启用\s*\(v[\d.]+\)/.test(l); };
@@ -252,6 +267,17 @@ function cmdCheckAll() {
     /^\s{4}settings: \{ textSize: 16, codeSize: 13\.5, inlineCodeSize: 12 \},$/,
     /^\s{6}'\.markdown-body img \{ max-width: 100%; height: auto; border-radius: 4px; \}',$/,
     /^\s{12}inlineCodeSize: Number\(parsed\.inlineCodeSize\) \|\| 12$/,
+    // v1.1.04 PDF 水印 logo：这些行都因「加装 logo 水印」被有意改写/移位
+    //   - inlineImagesForExport 上方插入 loadPdfLogo/downscaleLogoBlob 新区块，
+    //     其后的注释与函数签名行位置变化
+    //   - buildPdfCss 里加了两条 .pdf-logo 规则，标题不跨页那两行的注释改了措辞
+    //   - buildPdfDocumentHtml 多接一个 logoDataUrl 参数并输出 .pdf-logo 节点
+    //   - 两个调用点（导出、预览）外面多包一层 loadPdfLogo 回调，整段缩进+2
+    /^\s{2}\/\/ 导出前把 blob:\/相对路径 图片内联为 data URL/,
+    /^\s{6}\/\* prince 专用：标题避免跨页 \*\/$/,
+    /^\s{6}'h1, h2, h3, h4, h5, h6 \{ page-break-after: avoid; \}'$/,
+    /^\s{2}\/\/ 完整独立 HTML 文档（导出给 prince 的/,
+    /^\s{2}function buildPdfDocumentHtml\(bodyHtml, title, layout, colors\) \{$/,
   ];
   // 整函数重写的白名单：当一次修改是「整段重写」某个函数而不是改几行时，
   // 逐行白名单会膨胀到几十条、失去审计意义。这里按「函数体范围」放行：
@@ -275,6 +301,12 @@ function cmdCheckAll() {
     // 内容一字未改但位置后移，逐行顺序比对会当成「找不到」——一并放行。
     'restoreTheme',
     'init',
+    // exportCurrentPdf / refreshPdfPreview / generatePdfPreview：
+    // v1.1.04 加水印 logo 时，三处调用 buildPdfDocumentHtml 的地方都多包了一层
+    // loadPdfLogo 回调，函数体整体缩进 +2，逐行比对必然全部对不上 —— 整函数放行。
+    'exportCurrentPdf',
+    'refreshPdfPreview',
+    'generatePdfPreview',
   ];
   const rewrittenRanges = REWRITTEN_FUNCS.map(function (name) {
     const re = new RegExp('^\\s*(?:async\\s+)?function ' + name + '\\s*\\(');

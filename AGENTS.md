@@ -325,6 +325,44 @@ PDF 主题 = **配色**（`state.pdfColors`，含语法色）+ **版式**（`sta
    一律经 `normalizePdfLayout()` 夹取。
 4. **标题缩放不要在 CSS 里用 `calc()`**，在 JS 里算好 `em` 乘积再写出去（prince 对 calc 的支持不可依赖）。
 
+### 6.16 PDF 水印 logo：只印第一页，用 absolute 不用 fixed
+
+**需求**：PDF 第一页右上角印项目 logo（`hutao.jpg`）。
+
+**做法**：`buildPdfDocumentHtml()` 在 `<body>` 里、`.markdown-body` **之前**插入
+`<div class="pdf-logo"><img src="data:..."></div>`，样式：
+
+```css
+.pdf-logo     { position: absolute; top: -20mm; right: -18mm; }  /* 值 = @page 页边距 */
+.pdf-logo img { width: 14mm; height: auto; display: block; }
+```
+
+**四个关键点（都是踩过或想清楚才定的）**：
+
+1. **必须 `absolute`，绝不能 `fixed`** —— `fixed` 在分页媒体里会在**每一页**重复。
+   绝对定位元素相对「首页内容框」定位，天然只落在第一页。
+2. **负的 `top` / `right` 用来把 logo 推进 `@page` 页边距区域**，
+   这样它落在右上角留白里，**不占正文位置**（绝对定位也脱离文档流）。
+   值直接取 `L.marginV` / `L.marginH`，所以用户在 PDF 版式里改页边距时，logo 会跟着对齐。
+3. **logo 必须内联成 data URL**：导出时 HTML 会写到临时文件、以 `file://` 打开，
+   相对路径 `hutao.jpg` 在那种上下文里取不到。处理方式与正文图片一致
+   （正文走 `inlineImagesForExport`，logo 走 `loadPdfLogo`）。
+4. **必须优雅降级**：`file://` 下 `fetch` 会被浏览器拦截。
+   读不到就**不印水印**（回调 `null`），绝不能抛错或阻断导出 ——
+   导出 PDF 本来就需要本地服务器，但降级路径仍然要通。
+
+**为什么要缩放**：原图 1022×1022 / 127KB，base64 后 169KB，
+而水印只显示 14mm（96dpi 下约 53px）。用 canvas 在浏览器里实时缩到 200×200
+（300dpi 印刷也够），base64 降到约 1/8 —— **不引入构建步骤或依赖**，
+双击 `index.html` 仍然可用。这是本项目一贯的取舍：能在运行时算出来的，就不预生成文件。
+
+**三处调用点都要带 logo**：导出 PDF（`exportCurrentPdf`）、
+抽屉内即时预览（`refreshPdfPreview`）、弹层真实预览（`generatePdfPreview`），
+否则会出现「预览没有、导出才有」的不一致。
+
+**水印只加在 PDF 路径**：导出的 HTML（`exportCurrentHtml`）不含水印，
+阅读界面也不显示 —— 它是 PDF 的品牌标记，不是页面内容。
+
 **PDF 引擎：用系统自带的 Edge / Chrome，不要用 Prince（v1.1.03 起）**
 
 `serve.py` 的 PDF 导出走**无头 Chromium**（Edge / Chrome）打印，不再调用 Prince。原因：

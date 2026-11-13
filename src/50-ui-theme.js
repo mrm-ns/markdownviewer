@@ -435,7 +435,10 @@
     const panel = document.getElementById('pdf-theme-panel');
     if (panel && panel.hidden) return;
     buildPdfPreviewBody(function (bodyHtml) {
-      frame.srcdoc = buildPdfDocumentHtml(bodyHtml, 'PDF 预览', state.pdfLayout, state.pdfColors);
+      // 抽屉内的即时预览同样带上水印 logo，保证「预览 = 导出」外观一致
+      loadPdfLogo(function (logoDataUrl) {
+        frame.srcdoc = buildPdfDocumentHtml(bodyHtml, 'PDF 预览', state.pdfLayout, state.pdfColors, logoDataUrl);
+      });
     });
   }
   const refreshPdfPreviewDebounced = debounce(refreshPdfPreview, 200);
@@ -503,8 +506,9 @@
     const status = document.getElementById('pdf-preview-status');
     const frame = document.getElementById('pdf-preview-frame-lg');
     buildPdfPreviewBody(function (bodyHtml) {
-      const html = buildPdfDocumentHtml(bodyHtml, 'PDF 预览', state.pdfLayout, state.pdfColors);
-      if (status) status.textContent = '正在生成…（prince 渲染通常需要 1–3 秒）';
+      loadPdfLogo(function (logoDataUrl) {
+      const html = buildPdfDocumentHtml(bodyHtml, 'PDF 预览', state.pdfLayout, state.pdfColors, logoDataUrl);
+      if (status) status.textContent = '正在生成…（浏览器渲染通常需要 1–3 秒）';
       fetch('/api/export-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -528,6 +532,7 @@
         console.error('[Markdown Viewer] PDF 预览失败', err);
         if (status) status.textContent = '生成失败：' + err.message;
         toast('PDF 预览失败：' + err.message);
+      });
       });
     });
   }
