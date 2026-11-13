@@ -29,14 +29,24 @@ http://localhost:8000
 > **无需第三方依赖**：`serve.py` 仅使用 Python 标准库，不需要 pip 安装任何包，也不需要虚拟环境（venv）。
 > 服务器已内置 HTTP/1.1 keep-alive、gzip 压缩与 304 条件缓存，刷新和二次访问都很快。
 
-### Prince（PDF 导出必需）
+### PDF 导出（无需额外安装）
 
-`serve.py` 的 PDF 导出功能通过 [Prince](https://www.princexml.com/) 命令行工具将 HTML 转换为 PDF。
+`serve.py` 的 PDF 导出通过**系统自带的 Chromium 内核浏览器**（Microsoft Edge 或 Google Chrome）
+以无头模式把 HTML 打印成 PDF，**不依赖任何第三方命令行工具**：
 
-- 下载地址：<https://www.princexml.com/download/>
-- 安装后将 `prince` 命令添加到系统环境变量（PATH）
-- 验证安装：在终端执行 `prince --version` 应显示版本信息
-- 无需 Prince 也能正常浏览 Markdown 文档，仅「导出 PDF」功能需要
+- Windows 10/11 自带 Microsoft Edge，开箱即用，**无需安装任何东西**
+- macOS / Linux 上会依次查找 Chrome / Edge / Chromium
+- 查找顺序：环境变量 `MD_PDF_BROWSER` → `PATH` 上的 `msedge` / `chrome` / `chromium` 等
+  → 各平台默认安装位置
+- 可用环境变量 `MD_PDF_BROWSER` 指定任意路径（绿色版 / 自定义安装位置），例如：
+  `set MD_PDF_BROWSER=D:\Tools\Chrome\chrome.exe`
+
+> **为什么不再用 Prince**：Prince 是商业软件，其免费「非商业授权」会在输出 PDF 的
+> 右上角强制盖一个 `Prince` 水印。该水印由二进制自己添加，**没有任何命令行参数或 CSS
+> 能去掉它**，只能通过购买授权消除。改用浏览器引擎后输出**无水印**，且无需安装。
+>
+> 如果你已经购买了 Prince 授权，可以设置 `MD_PDF_ENGINE=prince` 切回 Prince
+> （排版分页质量更好，且授权版没有水印）。
 
 ## 功能与环境对应关系
 
@@ -45,7 +55,7 @@ http://localhost:8000
 | Markdown 渲染 / 高亮 / 主题 / 搜索 | 仅浏览器即可 |
 | 打开代码 / 配置文件（`.txt` / `.py` / `.sh` / `.json` / `.yaml` / `Dockerfile` 等，按语法高亮） | 仅浏览器即可 |
 | 本地静态服务器 | Python 3.6+ |
-| 导出 PDF | Python 3.6+ + Prince |
+| 导出 PDF | Python 3.6+ + Edge / Chrome（系统自带，无需安装） |
 | 默认目录自动打开 / 编辑写回磁盘 | Chrome / Edge 的 File System Access API |
 | 右键重命名（真实磁盘） | Chrome / Edge + 读写权限目录 |
 

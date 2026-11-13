@@ -325,6 +325,32 @@ PDF 主题 = **配色**（`state.pdfColors`，含语法色）+ **版式**（`sta
    一律经 `normalizePdfLayout()` 夹取。
 4. **标题缩放不要在 CSS 里用 `calc()`**，在 JS 里算好 `em` 乘积再写出去（prince 对 calc 的支持不可依赖）。
 
+**PDF 引擎：用系统自带的 Edge / Chrome，不要用 Prince（v1.1.03 起）**
+
+`serve.py` 的 PDF 导出走**无头 Chromium**（Edge / Chrome）打印，不再调用 Prince。原因：
+
+- Prince 是商业软件，免费「非商业授权」会在输出 PDF 右上角**强制盖 "Prince" 水印**。
+  该水印由二进制自己添加，**没有任何命令行参数或 CSS 能去掉**，只能购买授权消除。
+- Edge 在 Windows 10/11 上自带，**零安装**，且输出无水印 —— 同时满足了项目
+  「无第三方依赖、无 CDN、无 npm」的约束。
+
+切换实现时踩到的坑（改 `serve.py` 时务必留意）：
+
+| 坑 | 后果 | 处理 |
+|---|---|---|
+| `--user-data-dir` 必须指向**独立临时目录** | 复用用户默认 profile 时，若用户已开着浏览器，请求会被交给已运行实例，**不产出 PDF** | 用 `tempfile.mkdtemp()`，并在 `finally` 里 `shutil.rmtree` |
+| 不能按退出码判成败 | Chromium 常带着无害告警返回非 0，但 PDF 已正常生成 | 改为判**产物**：文件存在且 **size > 0**（0 字节也算失败） |
+| 默认会印页眉页脚 | 页面顶部/底部出现文件路径、日期、页码 | 传 `--no-pdf-header-footer` |
+| 不再需要 `--css-dpi 96` | — | Chromium 排版本身按 96 CSS px/英寸，与 CSS px 一致 |
+| `--javascript` 不再需要 | — | 导出的 HTML 是自包含的（无 `<script>`，图片已内联为 data: URL） |
+
+保留了一个兼容开关：环境变量 **`MD_PDF_ENGINE=prince`** 可切回 Prince
+（供已购授权的用户使用，排版的 paged-media 保真度确实更好）；
+环境变量 **`MD_PDF_BROWSER`** 可指定浏览器可执行文件路径（绿色版 / 自定义安装位置）。
+两者都读不到时才回落自动探测。
+
+
+
 校验入口只有一个：`normalizePdfLayout(raw)`（纯函数）。注意 `Number('')` 是 `0` 而不是 `NaN`，
 清空输入框会被夹成最小值——必须显式判空回落到默认值。
 

@@ -6,14 +6,17 @@
     1. Python 3.6+   (required)  installs it via winget when missing
     2. Modern browser (required)  looks for Edge / Chrome
     3. Python stdlib self-check   imports what serve.py needs + binds a TCP port
-    4. Prince        (optional)   detect only; when missing it is SKIPPED
-                                  (only the "export PDF" feature needs it)
+    4. PDF engine    (built in)   Edge / Chrome is printed headlessly to PDF,
+                                  so "export PDF" needs NO extra install and
+                                  its output carries no watermark.
+                                  Prince is optional and only useful with a
+                                  license (MD_PDF_ENGINE=prince to switch).
 
   Usage:
     setup-env.bat                  check, then install what is missing
     setup-env.bat -Check           report only, change nothing
-    setup-env.bat -PrinceZip PATH  opt-in: install Prince from a local zip
-                                   you downloaded yourself
+    setup-env.bat -PrinceZip PATH  opt-in: install Prince from a local zip you
+                                   downloaded yourself (optional; needs a license)
     setup-env.bat -NoMirror        leave the winget source alone
     setup-env.bat -Mirror URL      use a different winget mirror
 
@@ -480,6 +483,8 @@ function Test-Browser {
     return $found
 }
 
+# Prince is optional: only needed if you own a license and prefer its typesetting.
+# PDF export defaults to the built-in Edge / Chrome and needs no installation.
 function Install-PrinceFromZip {
     param([string]$Zip)
     if (-not (Test-Path $Zip)) { Warn "PrinceZip not found: $Zip"; return }
@@ -563,29 +568,44 @@ if ($py) {
     Skip 'skipped, no usable Python.'
 }
 
-# --- 4. Prince -------------------------------------------------------------
-Step '4) Prince  (optional - only for "export PDF")'
-if ($PrinceZip) {
-    Warn 'installing Prince from a local zip (opt-in) ...'
-    Install-PrinceFromZip -Zip $PrinceZip
+# --- 4. PDF engine (Edge / Chrome) ----------------------------------------
+Step '4) PDF export engine  (Edge / Chrome, no install needed)'
+$browser = $null
+$browserName = ''
+foreach ($cand in @(
+    @{ Name = 'Microsoft Edge';   Path = (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe') },
+    @{ Name = 'Microsoft Edge';   Path = (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe') },
+    @{ Name = 'Google Chrome';    Path = (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe') },
+    @{ Name = 'Google Chrome';    Path = (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe') },
+    @{ Name = 'Google Chrome';    Path = (Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe') }
+)) {
+    if ($cand.Path -and (Test-Path $cand.Path)) { $browser = $cand.Path; $browserName = $cand.Name; break }
 }
+if (-not $browser) {
+    foreach ($cmd in @('msedge', 'chrome', 'chromium')) {
+        $g = Get-Command $cmd -ErrorAction SilentlyContinue
+        if ($g) { $browser = $g.Source; $browserName = $cmd; break }
+    }
+}
+if ($browser) {
+    Ok ("found: " + $browserName)
+    Hint ("path: " + $browser)
+    Hint 'PDF export works out of the box and produces NO watermark.'
+} else {
+    Warn 'No Edge / Chrome found - "export PDF" will be unavailable (everything else works).'
+    Hint 'Install Microsoft Edge or Google Chrome, or point MD_PDF_BROWSER at a browser:'
+    Hint '  set MD_PDF_BROWSER=D:\Tools\Chrome\chrome.exe'
+}
+
+# --- 5. Prince (optional, only if you own a license) ----------------------
 $prince = Get-Command prince -ErrorAction SilentlyContinue
 if ($prince) {
     $pv = Invoke-Native -Exe $prince.Source -ArgList @('--version')
-    Ok ("found: " + (($pv.Text -split "`n")[0]))
-    Hint ("path: " + $prince.Source)
+    Hint ("prince also detected: " + (($pv.Text -split "`n")[0]) + "  (optional)")
     if ($pv.Text -match 'Non-commercial') {
-        Hint 'license: Non-commercial (commercial use needs a Prince license)'
+        Hint 'license: Non-commercial - its output carries a "Prince" watermark.'
+        Hint 'To use it instead of the browser: set MD_PDF_ENGINE=prince (needs a paid license to drop the watermark).'
     }
-} else {
-    Skip 'Prince not found - PDF export will be unavailable (everything else works).'
-    Hint 'Prince is commercial software, so this script does not download it.'
-    Hint 'Manual steps:'
-    Hint '  1. download from https://www.princexml.com/download/'
-    Hint '  2. unzip anywhere, e.g. D:\Tools\Prince'
-    Hint '  3. add its bin folder (containing prince.exe) to PATH'
-    Hint '  4. verify with: prince --version'
-    Hint 'Or: setup-env.bat -PrinceZip <the zip you downloaded>'
 }
 
 # --- summary ---------------------------------------------------------------

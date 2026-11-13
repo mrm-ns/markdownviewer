@@ -6,6 +6,53 @@
 
 ---
 
+## [v1.1.03] - 2026-09-16
+### 变更
+- **PDF 导出引擎：Prince → 系统自带的 Edge / Chrome（去掉右上角 "Prince" 水印）**（用户需求）
+  - **背景**：之前用 Prince 把 HTML 转 PDF。Prince 免费「非商业授权」会在输出 PDF 的
+    右上角**强制盖一个 `Prince` 水印**。该水印由二进制自己添加，
+    **没有任何命令行参数或 CSS 能去掉它**，也不可替换成别的图案 —— 只能购买授权消除。
+  - **改动**：`serve.py` 改为调用**无头 Chromium**（Edge / Chrome）打印 PDF。
+    - Windows 10/11 自带 Edge，**开箱即用、无需安装任何东西**，且输出**无水印**
+    - 自动探测顺序：环境变量 `MD_PDF_BROWSER` → `PATH` → 各平台默认安装位置
+      （Windows 下同时查 `Program Files` 与 `Program Files (x86)`，因为 64 位系统上
+      Edge 也装在 x86 目录下；macOS / Linux 路径同样覆盖）
+    - 新增环境变量 `MD_PDF_BROWSER`：指定浏览器可执行文件路径（绿色版 / 自定义安装）
+    - 新增环境变量 `MD_PDF_ENGINE=prince`：**切回 Prince** —— 供已购授权的用户使用
+      （Prince 的 paged-media 保真度确实更好，授权版没有水印）
+  - **实现要点**（都是 Chromium 与 Prince 的差异，逐条处理过）：
+    | 差异 | 处理 |
+    |---|---|
+    | 复用用户默认 profile 时，若浏览器已开着，请求会被交给已运行实例、**不产出 PDF** | 用 `tempfile.mkdtemp()` 建**独立临时 profile**，`finally` 里 `shutil.rmtree` 清理 |
+    | Chromium 常带着无害告警返回非 0 退出码，但 PDF 已生成 | 改为按**产物**判定：文件存在且 `size > 0`（0 字节也算失败，比原来的「仅判断存在」更严） |
+    | 默认会印上页眉页脚（文件路径 / 日期 / 页码） | 传 `--no-pdf-header-footer` |
+    | Prince 需要 `--css-dpi 96` | 不再传：Chromium 排版本身按 96 CSS px/英寸，与 CSS 的 px 一致 |
+    | Prince 需要 `--javascript` | 不再传：导出的 HTML 是自包含的（无 `<script>`，图片已内联为 data: URL） |
+    | 临时 profile 目录需要清理 | `finally` 里一并删除，不留残留 |
+  - **接口与产物路径不变**：仍是 `POST /api/export-pdf`，仍是用毕即删的临时文件；
+    前端（导出、抽屉内真实 PDF 预览）**一行都没改**。
+- 环境与文档同步更新：`ENVIRONMENT.md`（去掉「安装 Prince」小节，改为说明浏览器方案与环境变量）、
+  `setup-env.ps1`（第 4 步从「检测 Prince」改为「检测 PDF 引擎」，找不到浏览器时给出指引；
+  Prince 降级为可选探测）、`AGENTS.md`（新增 PDF 引擎小节，记录上述差异坑）。
+### 说明
+- **需要实测确认的三点**（按既有约定，本次未做浏览器实测）：
+  1. Chromium 是否按 `@page { size: A4; margin: 20mm 18mm }` 正确应用纸张与页边距
+  2. 页眉页脚是否已完全关闭（`--no-pdf-header-footer` 在较旧版本上可能不被识别）
+  3. `page-break-after: avoid`（标题不跨页）在 Chromium 下的实际效果是否够用
+     —— 「标题不落单在页底」这块 Chromium 的实现比 Prince 弱，若观感不佳可后续改用
+     `break-inside: avoid` 等替代写法调整
+- **本次只改了 `serve.py` 与文档，未改任何前端代码**：`buildPdfCss()` / `buildPdfDocumentHtml()`
+  生成的 HTML/CSS 原样不变，所以 PDF 配色与版式设置的行为不受影响。
+- 已做的静态验证：`serve.py` 通过 `py_compile`；浏览器探测逻辑在
+  「默认 / 环境变量指向不存在路径 / 环境变量指向存在路径」三种情形下行为正确；
+  参数拼接断言全通过（含 `--headless=new`、`--no-pdf-header-footer`、独立 profile、
+  `file://` URI 生成、含空格路径被正确转义为 `%20`、不再传 `--css-dpi`）；
+  `setup-env.ps1` 通过 PowerShell 语法解析。
+- **升级后请按 `Ctrl + F5` 强制刷新**（`index.html` 的 `?v=` 已升到 1.1.03）；
+  若 `serve.py` 已在运行，**需要重启它**（`Ctrl+C` 后重新 `python serve.py`）才会生效。
+
+---
+
 ## [v1.1.02] - 2026-09-16
 ### 修复
 - **图片背景与图片不贴合，像「相框把图片包起来」**（用户报告）
