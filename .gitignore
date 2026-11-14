@@ -5,7 +5,8 @@ markdown-viewer-portable.zip
 __pycache__/
 *.py[cod]
 
-# Developer documentation (README.md and the shipped docs stay tracked)
+# Developer documentation (README.md stays tracked)
 AGENTS.md
 CHANGELOG.md
 TASKLIST.md
+ENVIRONMENT.md

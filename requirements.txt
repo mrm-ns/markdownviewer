@@ -1,0 +1,20 @@
+# Python dependencies for the Markdown Viewer tooling.
+#
+# There are none. Every script in this repository (serve.py, packup.py,
+# all_backup.py, make_backup.py, update_version.py, add_language.py,
+# compute_icon_hash.py) imports the standard library only -- hashlib,
+# http.server, socketserver, zipfile, subprocess, json, re, os, sys,
+# tempfile, shutil, gzip, pathlib, email.utils. Nothing has to be installed
+# for "export PDF" either: the PDF is rendered by a local browser.
+#
+# So this file is deliberately free of package requirements. Keep it that
+# way -- the project is meant to run offline with no pip step at all.
+#
+# Runtime requirement: Python 3.6 or newer. setup-env.ps1 / setup-env.bat
+# install it (via winget) when it is missing.
+#
+# Not managed by pip:
+#   * Microsoft Edge or Google Chrome -- launched headless by serve.py to
+#     print the PDF. Bundled with Windows 10/11; override the path with
+#     MD_PDF_BROWSER if it lives somewhere unusual.
+#   * Prince XML -- only for licensed users; opt in with MD_PDF_ENGINE=prince.
