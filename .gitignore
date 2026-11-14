@@ -4,3 +4,6 @@ markdown-viewer-portable.zip
 # Python
 __pycache__/
 *.py[cod]
+
+# Dev notes
+TASKLIST.md
