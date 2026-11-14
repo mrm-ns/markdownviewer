@@ -406,11 +406,18 @@
     };
 
     const bodyStyles = [
-      '@page { size: ' + L.pageSize + '; margin: ' + L.marginV + 'mm ' + L.marginH + 'mm; }',
-      // body 的 padding 取与 @page 相同的页边距，并在下面用 padding-box 定位 logo：
-      // 这样 body 的「外边缘」正好落在纸张的页边距分界线上，
-      // logo 用 top/right 正偏移就能稳稳落在留白区里（见 .pdf-logo 与 AGENTS.md §6.16）。
-      'body { margin: 0; padding: ' + L.marginV + 'mm ' + L.marginH + 'mm; background: ' + C.pdfPageBg + '; color: ' + C.pdfText + '; position: relative; box-sizing: border-box; }',
+      // 页边距的分工（v1.1.07 修复「文字边界变窄」）：
+      //   · 上下边距 + 左边距交给 @page —— 这两个方向必须由 @page 提供，因为分页时
+      //     它们要在**每一页**生效，而 body 的 padding-top 只作用于第一页那个片段；
+      //   · 右边距由「@page 右边距 0 + body 的 padding-right = marginH」共同构成。
+      // 于是正文左右边界仍是 [marginH, 纸张宽 - marginH]，宽度与历史值完全一致（A4+18mm = 174mm），
+      // 同时右侧那 marginH mm 的空白带正好留给 logo 水印（logo 落在 body 的 padding 带内，
+      // 属于「绘制区内」，不依赖把元素画进 @page 页边距，因而没有被裁掉的风险）。
+      //
+      // 踩过的坑（v1.1.06）：把**整个**页边距同时写进 @page 和 body padding，
+      // 等于页边距算了两遍 → 正文宽度从 174mm 缩到 138mm（用户反馈「文字边界变窄了」）。
+      '@page { size: ' + L.pageSize + '; margin: ' + L.marginV + 'mm 0 ' + L.marginV + 'mm ' + L.marginH + 'mm; }',
+      'body { margin: 0; padding: 0 ' + L.marginH + 'mm 0 0; background: ' + C.pdfPageBg + '; color: ' + C.pdfText + '; position: relative; box-sizing: border-box; }',
       '.markdown-body { max-width: 100%; margin: 0 auto; padding: 0; color: ' + C.pdfText + '; font-size: ' + L.textSize + 'px; line-height: ' + L.lineHeight + '; word-wrap: break-word; font-family: ' + bodyFont + '; }',
       '.markdown-body h1, .markdown-body h2 { padding-bottom: 0.3em; border-bottom: 1px solid ' + C.pdfBorder + '; }',
       '.markdown-body h1 { font-size: ' + scaled(2) + '; margin: 0.67em 0; color: ' + C.pdfHeading + '; }',
@@ -441,15 +448,17 @@
          用 position:absolute 而**不是** fixed —— fixed 会在每一页重复，
          绝对定位元素相对「首页内容框」定位，所以天然只出现在第一页。
 
-         定位基准是 body 的 padding-box 边缘（body 有 position:relative，
-         且 padding 与 @page 页边距相同），所以 right:0 时 logo 的右边缘
-         正好落在正文区右边界上、整块都在右侧留白里，不压正文。
+         定位基准是 body 的 padding-box：它右侧那条留白带就是
+         [正文右边界, 纸张右边缘]，所以 right:2mm 让 logo 落在带内、
+         距纸张右边缘 2mm、与正文留 3mm 间隙（13mm 宽时）。
+         top:0 → 与正文顶部对齐（即距纸张上边缘 marginV mm）。
 
-         **不要**改用负值去「往外推」：实测（Chromium --print-to-pdf）
-         负偏移会把 logo 整块推到纸张之外、完全看不见（详见 AGENTS.md §6.16）。
-         top 用 2mm 是为了避开打印机通常存在的不可打印边缘。 */
-      '.pdf-logo { position: absolute; top: 2mm; right: 0; }',
-      '.pdf-logo img { width: 14mm; height: auto; display: block; }'
+         **不要**改成负值往外推：实测（Chromium --print-to-pdf）负偏移
+         会把 logo 整块推到纸张之外、完全看不见（见 AGENTS.md §6.16）。
+         **也不要**再给 body 加「整页边距」的 padding：那会把正文挤窄
+         （v1.1.06 的教训，见上面 @page 处的分工说明）。 */
+      '.pdf-logo { position: absolute; top: 0; right: 2mm; }',
+      '.pdf-logo img { width: 13mm; height: auto; display: block; }'
     ].join('\n');
 
     const appVars = ':root {\n' +

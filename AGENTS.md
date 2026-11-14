@@ -361,35 +361,44 @@ PDF 主题 = **配色**（`state.pdfColors`，含语法色）+ **版式**（`sta
 **做法**：`buildPdfDocumentHtml()` 在 `<body>` 里、`.markdown-body` **之前**插入
 `<div class="pdf-logo"><img src="data:..."></div>`。
 
-关键 CSS 是**两处配合**（只写一处都不会对）：
+关键 CSS 是**三处配合**（页边距只允许算一遍）：
 
 ```css
-/* body 的 padding 取与 @page 相同的页边距，并成为定位包含块 */
-body { margin: 0; padding: <marginV>mm <marginH>mm; position: relative; box-sizing: border-box; }
+/* 上下边距 + 左边距交给 @page；右边距故意留 0，由 body 的 padding-right 补上 */
+@page { size: <pageSize>; margin: <marginV>mm 0 <marginV>mm <marginH>mm; }
 
-/* logo 用小的正偏移，就落在 padding 之外、页边距留白之内 */
-.pdf-logo     { position: absolute; top: 2mm; right: 0; }
-.pdf-logo img { width: 14mm; height: auto; display: block; }
+/* body 只保留右侧那条留白带，作为 logo 的定位包含块 */
+body { margin: 0; padding: 0 <marginH>mm 0 0; position: relative; box-sizing: border-box; }
+
+/* logo 落在 body 的 padding 带内：距纸张右边缘 2mm，与正文留 3mm 间隙 */
+.pdf-logo     { position: absolute; top: 0; right: 2mm; }
+.pdf-logo img { width: 13mm; height: auto; display: block; }
 ```
 
-**为什么必须给 body 加 padding**：只写 `position:absolute; top:0; right:0` 时，
-包含块是**正文内容区**，logo 会压在正文上。
-把 `body` 的 padding 设成与 `@page` 相同的页边距后，body 的 padding-box 边缘
-正好是「内容区/留白区」的分界线，logo 用 `right:0` 就贴在这条线上、
-整块都在右侧留白里 —— 既不压正文，又没跑出纸张。
+**页边距的分工原则（v1.1.07 修复「文字边界变窄」后定稿）**：
+
+| 方向 | 由谁提供 | 为什么 |
+|---|---|---|
+| 上 / 下边距 | `@page` | 分页时要在**每一页**生效；`body` 的 padding-top 只作用于第一页片段，放到 body 上会让第 2 页起贴到纸边 |
+| 左边距 | `@page` | 简单直接 |
+| 右边距 | `@page 0` + `body padding-right` | 两者相加才等于 `marginH`，而 body 的 padding 带正好成为 logo 的落点（属于绘制区内，不依赖把元素画进 `@page` 页边距） |
+
+**正文宽度必须等于历史值**：A4 + 18mm 时左右边界为 `[18mm, 192mm]`、宽度 **174mm**。
+`buildPdfCss` 生成后请照这个数核对——**这是判断有无「页边距算两遍」的唯一可靠标准**。
+
+> ⚠️ **v1.1.06 的教训（用户反馈「文字边界变窄了」）**：当时为了给 logo 让位，
+> 把**整个**页边距同时写进 `@page` 和 `body padding`：
+> `@page { margin: 20mm 18mm }` + `body { padding: 20mm 18mm }`。
+> 于是页边距被算了两遍，正文宽度从 174mm 缩到 **138mm**（少 21%）。
+> **永远不要给 body 加「整页边距」的 padding。**
 
 **五个关键点**：
 
 1. **必须 `absolute`，绝不能 `fixed`** —— `fixed` 在分页媒体里会在**每一页**重复。
    绝对定位元素相对首页内容框定位，天然只落在第一页。
-2. **`right` 取 `0`，`top` 取小的正值（2mm）。**
-   实测数据（A4 + 20mm/18mm 页边距，1mm ≈ 3.78px，内容区右边界 x=726）：
-   | `right` | logo 左边缘 | 结果 |
-   |---------|------------|------|
-   | `0` | x=726 | ✓ 正好在留白区 |
-   | `1mm` | x=722 | ✗ 压正文 |
-   | `2mm` | x=719 | ✗ 压正文 |
-   `top: 2mm` 是为了避开打印机通常存在的不可打印边缘。
+2. **logo 必须落在 body 的 padding 带内（即「绘制区内」）**，不要试图画进 `@page` 页边距：
+   负偏移会被推到纸张外（第 3 点），而靠 padding 撑出来的带子既在绘制区内、
+   又视觉上位于正文右侧留白，同样达到「不压正文」的效果。
 3. **绝不能用负偏移。** 这是 v1.1.04→v1.1.06 连踩两次的坑：
    写 `top: -20mm; right: -18mm` 想「把 logo 推出去」，实测**logo 被整块推到纸张之外，完全看不见**。
    连 `top:-14mm` 都会让它完全消失。**负偏移在 Chromium 打印里不会把它推进留白，只会推出纸外。**
@@ -398,6 +407,11 @@ body { margin: 0; padding: <marginV>mm <marginH>mm; position: relative; box-sizi
    （正文走 `inlineImagesForExport`，logo 走 `loadPdfLogo`）。
 5. **必须优雅降级**：`file://` 下 `fetch` 会被浏览器拦截。
    读不到就**不印水印**（回调 `null`），绝不能抛错或阻断导出。
+
+**logo 的垂直位置**：`top: 0` 相对 body 的 padding-box，即与正文顶部对齐（距纸张上边缘 `marginV` mm）。
+它的**上边不会再往上靠**——再往上就是 `@page` 的上边距留白，而那一片只有把上边距从 `@page` 挪到
+`body padding` 才能画出，代价是第 2 页起失去上边距（见上面的分工表），不值得。
+
 
 **为什么要用预生成的小图**：原图 `hutao.jpg` 是 1022×1022 / 127KB，
 而水印只显示 14mm（96dpi 下约 53px，300dpi 约 165px）。
