@@ -1573,9 +1573,30 @@
   // 为什么要单独抽出来：即时样式预览必须与真实导出**看起来完全一样**，
   // 样式只在这里生成一次，导出流程与两套预览都调它，从结构上杜绝两边走偏。
   // 纯函数、只依赖入参（见 AGENTS.md §5.1 / §7）。
+  // logo 水印的宽度决策：buildPdfCss 与 buildPdfDocumentHtml **必须共用**这一个判据，
+  // 否则会出现「CSS 按 A4 的 13mm 排、HTML 却按别的尺寸插节点」这种两边不一致。
+  //
+  // 为什么要算而不是写死 13mm：logo 只能落在右侧那条 padding 带里，带宽恰好 = marginH。
+  // 13mm 图 + 2mm 右边距 + 3mm 与正文的间隙 = 需要 18mm 带宽，
+  // 所以用户把 marginH 调到 15mm 以下时，固定 13mm 的 logo 会**盖住正文首行右端**
+  // （marginH=0 时整块压在正文上）。带宽不够就缩图，缩到认不出（< 4mm）就干脆不印。
+  // 返回 0 = 不印水印，与 loadPdfLogo 读不到文件时的降级方式一致（见 AGENTS.md §6.16）。
+  const PDF_LOGO_MAX_MM = 13;    // 历史尺寸（A4 + 18mm 时就是这个值，默认外观不变）
+  const PDF_LOGO_MIN_MM = 4;     // 再小就认不出来了，不如不印
+  const PDF_LOGO_RIGHT_MM = 2;   // logo 距纸张右边缘
+  const PDF_LOGO_GAP_MM = 3;     // logo 与正文的间隙
+  function pdfLogoWidthMm(layout) {
+    const L = normalizePdfLayout(layout);
+    const avail = L.marginH - PDF_LOGO_RIGHT_MM - PDF_LOGO_GAP_MM;
+    const w = Math.min(PDF_LOGO_MAX_MM, avail);
+    // avail 为负（带宽不够摆下右边距+间隙）时同样落到这里 → 0 → 不印
+    return w >= PDF_LOGO_MIN_MM ? w : 0;
+  }
+
   function buildPdfCss(layout, colors) {
     const L = normalizePdfLayout(layout);
     const C = colors || PDF_BASE_COLORS;
+    const logoW = pdfLogoWidthMm(L);
     // 代码块语法配色来自 PDF 配色（state.pdfColors 已含完整语法色），可单独配置
     const cssVars = themeCss({ colors: C, isDark: false, customCSS: '' });
     const bodyFont = PDF_FONT_PRESETS.body[L.bodyFont] || PDF_FONT_PRESETS.body.system;
@@ -1586,18 +1607,20 @@
     };
 
     const bodyStyles = [
-      // 页边距的分工（v1.1.07 修复「文字边界变窄」）：
-      //   · 上下边距 + 左边距交给 @page —— 这两个方向必须由 @page 提供，因为分页时
-      //     它们要在**每一页**生效，而 body 的 padding-top 只作用于第一页那个片段；
-      //   · 右边距由「@page 右边距 0 + body 的 padding-right = marginH」共同构成。
-      // 于是正文左右边界仍是 [marginH, 纸张宽 - marginH]，宽度与历史值完全一致（A4+18mm = 174mm），
-      // 同时右侧那 marginH mm 的空白带正好留给 logo 水印（logo 落在 body 的 padding 带内，
-      // 属于「绘制区内」，不依赖把元素画进 @page 页边距，因而没有被裁掉的风险）。
+      // 页边距的分工（v1.1.08 定稿）：
+      //   · 上下边距交给 @page —— 必须由 @page 提供，因为分页时它们要在**每一页**生效，
+      //     而 body 的 padding-top 只作用于第一页那个片段；
+      //   · 左右边距交给 body 的 padding —— 这样**屏幕预览也是对称的**
+      //     （@page 在屏幕上不生效，若只用 @page 的左右边距，抽屉里的即时预览就会文字贴左）。
+      //   · 右边那条 padding 带同时是 logo 的落点：它在 body 的 padding-box 内（属于绘制区，
+      //     不依赖把元素画进 @page 页边距，因而没有被裁掉的风险）。
+      // 于是正文左右边界仍是 [marginH, 纸张宽 - marginH]，宽度与历史值完全一致
+      // （A4 + 18mm → [18mm, 192mm]，宽 174mm）。
       //
       // 踩过的坑（v1.1.06）：把**整个**页边距同时写进 @page 和 body padding，
       // 等于页边距算了两遍 → 正文宽度从 174mm 缩到 138mm（用户反馈「文字边界变窄了」）。
-      '@page { size: ' + L.pageSize + '; margin: ' + L.marginV + 'mm 0 ' + L.marginV + 'mm ' + L.marginH + 'mm; }',
-      'body { margin: 0; padding: 0 ' + L.marginH + 'mm 0 0; background: ' + C.pdfPageBg + '; color: ' + C.pdfText + '; position: relative; box-sizing: border-box; }',
+      '@page { size: ' + L.pageSize + '; margin: ' + L.marginV + 'mm 0 ' + L.marginV + 'mm 0; }',
+      'body { margin: 0; padding: 0 ' + L.marginH + 'mm; background: ' + C.pdfPageBg + '; color: ' + C.pdfText + '; position: relative; box-sizing: border-box; }',
       '.markdown-body { max-width: 100%; margin: 0 auto; padding: 0; color: ' + C.pdfText + '; font-size: ' + L.textSize + 'px; line-height: ' + L.lineHeight + '; word-wrap: break-word; font-family: ' + bodyFont + '; }',
       '.markdown-body h1, .markdown-body h2 { padding-bottom: 0.3em; border-bottom: 1px solid ' + C.pdfBorder + '; }',
       '.markdown-body h1 { font-size: ' + scaled(2) + '; margin: 0.67em 0; color: ' + C.pdfHeading + '; }',
@@ -1636,10 +1659,18 @@
          **不要**改成负值往外推：实测（Chromium --print-to-pdf）负偏移
          会把 logo 整块推到纸张之外、完全看不见（见 AGENTS.md §6.16）。
          **也不要**再给 body 加「整页边距」的 padding：那会把正文挤窄
-         （v1.1.06 的教训，见上面 @page 处的分工说明）。 */
-      '.pdf-logo { position: absolute; top: 0; right: 2mm; }',
-      '.pdf-logo img { width: 13mm; height: auto; display: block; }'
-    ].join('\n');
+         （v1.1.06 的教训，见上面 @page 处的分工说明）。
+
+         宽度由 pdfLogoWidthMm() 算出来，不是写死的 13mm：
+         右边那条 padding 带的宽度恰好就是 marginH，带宽不够时缩图，
+         缩到认不出（< 4mm）就不印 —— 否则 marginH 调小后 logo 会盖住正文首行右端。 */
+      '.pdf-logo { position: absolute; top: 0; right: ' + PDF_LOGO_RIGHT_MM + 'mm; }',
+      '.pdf-logo img { width: ' + logoW + 'mm; height: auto; display: block; }'
+    ].filter(function (rule) {
+      // logoW = 0（右侧 padding 带放不下水印）时丢掉这两条 logo 规则，
+      // 不留「width: 0mm」这种空规则；节点本身也不会插（见 buildPdfDocumentHtml）
+      return logoW > 0 || rule.indexOf('.pdf-logo') !== 0;
+    }).join('\n');
 
     const appVars = ':root {\n' +
       '--app-fg: ' + C.pdfText + ';\n' +
@@ -1655,8 +1686,10 @@
 
   // 完整独立 HTML 文档（导出 PDF 的、以及预览 iframe 里用的，是同一份构建结果）
   // logoDataUrl 为 null 时不加水印（例如 file:// 下读不到 logo 文件）
+  // 右侧留白带放不下水印时（pdfLogoWidthMm 返回 0）同样不加水印：
+  // 宁可没有水印，也不能让 logo 盖住正文——判据与 buildPdfCss 共用同一个函数。
   function buildPdfDocumentHtml(bodyHtml, title, layout, colors, logoDataUrl) {
-    const logoHtml = logoDataUrl
+    const logoHtml = (logoDataUrl && pdfLogoWidthMm(layout) > 0)
       ? '<div class="pdf-logo"><img src="' + logoDataUrl + '" alt=""></div>\n'
       : '';
     return '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n' +
@@ -7128,7 +7161,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.07)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.08)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
