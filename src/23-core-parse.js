@@ -404,7 +404,8 @@
   const PDF_LOGO_MAX_MM = 13;    // 历史尺寸（A4 + 18mm 时就是这个值，默认外观不变）
   const PDF_LOGO_MIN_MM = 4;     // 再小就认不出来了，不如不印
   const PDF_LOGO_RIGHT_MM = 2;   // logo 距纸张右边缘
-  const PDF_LOGO_GAP_MM = 3;     // logo 与正文的间隙
+  const PDF_LOGO_GAP_MM = 3;     // logo 与正文的间隙（横向、纵向共用）
+  const PDF_LOGO_TOP_MIN_MM = 3; // 首页内容框上边距的下限（别让 logo 贴到纸边）
   function pdfLogoWidthMm(layout) {
     const L = normalizePdfLayout(layout);
     const avail = L.marginH - PDF_LOGO_RIGHT_MM - PDF_LOGO_GAP_MM;
@@ -413,10 +414,42 @@
     return w >= PDF_LOGO_MIN_MM ? w : 0;
   }
 
+  // logo 的**纵向**安排（v1.1.10）：把首页的内容框上边距单独收紧，logo 就顶到纸张右上角；
+  // 收紧掉的那一段再由 body 的 padding-top 补回去，于是**首页正文的位置一个字都没动**。
+  //
+  //   纸张顶 ─┬─ firstTop（= 首页上边距，收紧后）
+  //           │   ← logo 落在这里（top:0 相对 body 的 padding-box = 首页内容框顶）
+  //           ├─ firstTop + logo 宽 + 3mm 间隙
+  //   纸张顶 ─┴─ firstTop + bodyPadTop = marginV  ← 正文仍然从这里开始（与收紧前完全一致）
+  //
+  // 为什么必须用 `@page :first` 而不是负偏移：实测（无头 Edge，见 AGENTS.md §6.16）
+  // Chromium 会把每一页的内容**裁剪在 @page 内容框内**（内容流里有 `re W* n` 裁剪指令，
+  // 范围正是内容框），所以想把 logo 画进上边距留白是**画不进去**的 ——
+  // 负偏移的 logo 在内容流里连绘制指令都没有（v1.1.04→v1.1.06 的「logo 消失」就是这个原因），
+  // 而且元素溢出还会触发整页缩放（实测内层缩放从 3.125 掉到 2.9039）。
+  // `@page :first { margin-top }` 实测有效，且**只改首页**（第 2 页起内容框上边距不变）。
+  //
+  // bodyPadTop 取 max(…, band) 而不是直接用 marginV - firstTop：
+  // 当 marginV 比 logo 带还窄（用户把上边距调到 10mm 以下）时，正文必须给 logo 让路，
+  // 否则 logo 会压住正文首行。
+  function pdfLogoVerticalPlan(layout) {
+    const L = normalizePdfLayout(layout);
+    const w = pdfLogoWidthMm(L);
+    if (w <= 0) return { width: 0, firstTopMm: L.marginV, bodyPadTopMm: 0 };
+    const band = w + PDF_LOGO_GAP_MM;
+    const firstTopMm = Math.max(PDF_LOGO_TOP_MIN_MM, L.marginV - band);
+    return {
+      width: w,
+      firstTopMm: firstTopMm,
+      bodyPadTopMm: Math.max(L.marginV - firstTopMm, band)
+    };
+  }
+
   function buildPdfCss(layout, colors) {
     const L = normalizePdfLayout(layout);
     const C = colors || PDF_BASE_COLORS;
-    const logoW = pdfLogoWidthMm(L);
+    const logoPlan = pdfLogoVerticalPlan(L);
+    const logoW = logoPlan.width;
     // 代码块语法配色来自 PDF 配色（state.pdfColors 已含完整语法色），可单独配置
     const cssVars = themeCss({ colors: C, isDark: false, customCSS: '' });
     const bodyFont = PDF_FONT_PRESETS.body[L.bodyFont] || PDF_FONT_PRESETS.body.system;
@@ -427,7 +460,7 @@
     };
 
     const bodyStyles = [
-      // 页边距的分工（v1.1.08 定稿）：
+      // 页边距的分工（v1.1.08 定稿，v1.1.10 加首页特例）：
       //   · 上下边距交给 @page —— 必须由 @page 提供，因为分页时它们要在**每一页**生效，
       //     而 body 的 padding-top 只作用于第一页那个片段；
       //   · 左右边距交给 body 的 padding —— 这样**屏幕预览也是对称的**
@@ -437,10 +470,16 @@
       // 于是正文左右边界仍是 [marginH, 纸张宽 - marginH]，宽度与历史值完全一致
       // （A4 + 18mm → [18mm, 192mm]，宽 174mm）。
       //
+      // 首页特例（v1.1.10，见 pdfLogoVerticalPlan）：`@page :first` 把**首页**的内容框上边距
+      // 单独收紧到 firstTop，body 再用 padding-top 把正文推回 marginV ——
+      // 于是 logo（top:0，贴着内容框顶）落在纸张右上角，而首页正文位置与收紧前完全一致。
+      // 不印水印时 firstTop === marginV、bodyPadTop === 0，这两条规则等于什么都没做。
+      //
       // 踩过的坑（v1.1.06）：把**整个**页边距同时写进 @page 和 body padding，
       // 等于页边距算了两遍 → 正文宽度从 174mm 缩到 138mm（用户反馈「文字边界变窄了」）。
       '@page { size: ' + L.pageSize + '; margin: ' + L.marginV + 'mm 0 ' + L.marginV + 'mm 0; }',
-      'body { margin: 0; padding: 0 ' + L.marginH + 'mm; background: ' + C.pdfPageBg + '; color: ' + C.pdfText + '; position: relative; box-sizing: border-box; }',
+      '@page :first { margin-top: ' + logoPlan.firstTopMm + 'mm; }',
+      'body { margin: 0; padding: ' + logoPlan.bodyPadTopMm + 'mm ' + L.marginH + 'mm 0; background: ' + C.pdfPageBg + '; color: ' + C.pdfText + '; position: relative; box-sizing: border-box; }',
       '.markdown-body { max-width: 100%; margin: 0 auto; padding: 0; color: ' + C.pdfText + '; font-size: ' + L.textSize + 'px; line-height: ' + L.lineHeight + '; word-wrap: break-word; font-family: ' + bodyFont + '; }',
       '.markdown-body h1, .markdown-body h2 { padding-bottom: 0.3em; border-bottom: 1px solid ' + C.pdfBorder + '; }',
       '.markdown-body h1 { font-size: ' + scaled(2) + '; margin: 0.67em 0; color: ' + C.pdfHeading + '; }',
@@ -471,15 +510,18 @@
          用 position:absolute 而**不是** fixed —— fixed 会在每一页重复，
          绝对定位元素相对「首页内容框」定位，所以天然只出现在第一页。
 
-         定位基准是 body 的 padding-box：它右侧那条留白带就是
-         [正文右边界, 纸张右边缘]，所以 right:2mm 让 logo 落在带内、
-         距纸张右边缘 2mm、与正文留 3mm 间隙（13mm 宽时）。
-         top:0 → 与正文顶部对齐（即距纸张上边缘 marginV mm）。
+         定位基准是 body 的 padding-box：右边界就是纸张右边缘，所以 right:2mm
+         让 logo 距纸张右边缘 2mm；上边界就是首页内容框顶 = `@page :first` 里的
+         firstTop（默认 A4 + 20mm 上边距时是 4mm），于是 top:0 让它落在**纸张右上角**。
+         横向间距（13mm 宽时）：与正文留 3mm 间隙。
 
-         **不要**改成负值往外推：实测（Chromium --print-to-pdf）负偏移
-         会把 logo 整块推到纸张之外、完全看不见（见 AGENTS.md §6.16）。
+         **不要**改成负值往外推：实测（无头 Edge --print-to-pdf）负偏移的 logo
+         在内容流里连绘制指令都没有、整块不可见，而且元素溢出还会触发整页缩放
+         —— 因为 Chromium 把每页内容裁剪在 @page 内容框内（见 AGENTS.md §6.16）。
          **也不要**再给 body 加「整页边距」的 padding：那会把正文挤窄
          （v1.1.06 的教训，见上面 @page 处的分工说明）。
+         想让 logo 更靠上，只能调 pdfLogoVerticalPlan()（收紧首页上边距），
+         不能靠负偏移。
 
          宽度由 pdfLogoWidthMm() 算出来，不是写死的 13mm：
          右边那条 padding 带的宽度恰好就是 marginH，带宽不够时缩图，
@@ -487,9 +529,10 @@
       '.pdf-logo { position: absolute; top: 0; right: ' + PDF_LOGO_RIGHT_MM + 'mm; }',
       '.pdf-logo img { width: ' + logoW + 'mm; height: auto; display: block; }'
     ].filter(function (rule) {
-      // logoW = 0（右侧 padding 带放不下水印）时丢掉这两条 logo 规则，
-      // 不留「width: 0mm」这种空规则；节点本身也不会插（见 buildPdfDocumentHtml）
-      return logoW > 0 || rule.indexOf('.pdf-logo') !== 0;
+      // 放不下水印时（logoW = 0）丢掉 logo 规则与首页特例，不留「width: 0mm」这种空规则；
+      // 节点本身也不会插（见 buildPdfDocumentHtml），版面回到与以前完全一致
+      if (logoW > 0) return true;
+      return rule.indexOf('.pdf-logo') !== 0 && rule.indexOf('@page :first') !== 0;
     }).join('\n');
 
     const appVars = ':root {\n' +
@@ -509,7 +552,7 @@
   // 右侧留白带放不下水印时（pdfLogoWidthMm 返回 0）同样不加水印：
   // 宁可没有水印，也不能让 logo 盖住正文——判据与 buildPdfCss 共用同一个函数。
   function buildPdfDocumentHtml(bodyHtml, title, layout, colors, logoDataUrl) {
-    const logoHtml = (logoDataUrl && pdfLogoWidthMm(layout) > 0)
+    const logoHtml = (logoDataUrl && pdfLogoVerticalPlan(layout).width > 0)
       ? '<div class="pdf-logo"><img src="' + logoDataUrl + '" alt=""></div>\n'
       : '';
     return '<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n' +

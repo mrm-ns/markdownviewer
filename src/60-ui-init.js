@@ -1635,7 +1635,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.09)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.10)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
