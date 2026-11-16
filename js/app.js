@@ -2664,6 +2664,172 @@
     return null;
   }
 
+  // ---------- 按「选区位置」精确定位（v1.1.07） ----------
+  // 旧做法只按**文字内容**在源码里搜，同一行出现两次就报「无法唯一确定」，
+  // 用户明明只选了一处却不让上色。这里改成用**选区的字符偏移**定位：
+  // 把 DOM 里的可见文字逐字映射回源码下标，位置天然唯一，与重复无关。
+  //
+  // 关键点：DOM 文字是「源码去掉标记后的结果」——需要跳过三类不产生可见文字的片段：
+  //   1. markdown 行内标记  **  __  ~~  *  _  `
+  //   2. <font ...> / </font>（上色自己插入的）
+  //   3. <br> / <br/>（渲染时把段内换行变成 <br>）
+  // 跳过后做两指针扫描，得到「DOM 第 k 个字符对应源码第几个字符」的位置表。
+
+  // 返回 src[i] 处「纯标记」的长度（0 表示这是可见字符）
+  function markupLenAt(src, i) {
+    if (src.charCodeAt(i) === 60 /* '<' */) {
+      const rest = src.slice(i, i + 64);
+      let m = /^<font\b[^>]*>/i.exec(rest) || /^<\/font\s*>/i.exec(rest);
+      if (m) return m[0].length;
+      m = /^<br\s*\/?>/i.exec(rest);
+      if (m) return m[0].length;
+      return 0;
+    }
+    const rest = src.slice(i, i + 3);
+    let m = /^(\*\*|__|~~)/.exec(rest);
+    if (m) return m[0].length;
+    m = /^([*_`])/.exec(rest);
+    if (m) return m[0].length;
+    return 0;
+  }
+
+  // 把一段源码映射成 { text, pos }：text 是 DOM 可见文字，pos[k] 是第 k 个字符的源码下标
+  function buildDomToSourceMap(src) {
+    let text = '';
+    const pos = [];
+    let i = 0;
+    while (i < src.length) {
+      const skip = markupLenAt(src, i);
+      if (skip) { i += skip; continue; }
+      text += src[i];
+      pos.push(i);
+      i++;
+    }
+    return { text: text, pos: pos };
+  }
+
+  // 收集一个 DOM 元素内的「可见文字」，同时记录每个字符对应的 DOM 节点与节点内偏移，
+  // 以便把「选区起点（节点+偏移）」换算成「元素内的字符序号」。
+  // 跳过 <br>（它不产生文字，但在源码里对应一个换行，这里按 0 字符处理即可，
+  // 因为段内多行会在下面按行分别映射）。
+  function collectVisibleText(root) {
+    const chars = [];   // chars[k] = { node, offset }
+    (function walk(node) {
+      const kids = node.childNodes;
+      for (let i = 0; i < kids.length; i++) {
+        const c = kids[i];
+        if (c.nodeType === 3) {
+          const s = c.nodeValue || '';
+          for (let k = 0; k < s.length; k++) chars.push({ node: c, offset: k });
+        } else if (c.nodeType === 1) {
+          const tag = c.tagName ? c.tagName.toUpperCase() : '';
+          if (tag === 'BR') continue;              // 换行不产生文字
+          if (tag === 'INPUT') continue;           // 任务列表的复选框
+          walk(c);
+        }
+      }
+    })(root);
+    return chars;
+  }
+
+  // 把「DOM 节点 + 节点内偏移」换算成字符序号（在 collectVisibleText 的结果里查）。
+  // 注意两种语义：
+  //   - 选区**起点**：偏移指向「第 offset 个字符」，直接命中 chars 里的项。
+  //   - 选区**终点**：偏移指向「最后一个字符之后」，即 offset = 该节点文字长度，
+  //     此时 chars 里没有对应项，需要返回「该节点最后一个字符的下标 + 1」。
+  //     （旧版只按起点语义查，导致选中加粗文字这类「结尾正好在节点末尾」的情况
+  //       映射失败、整个定位回退甚至报错。）
+  function domPointToIndex(chars, node, offset, isEnd) {
+    for (let k = 0; k < chars.length; k++) {
+      if (chars[k].node === node && chars[k].offset === offset) return k;
+    }
+    if (isEnd) {
+      // 找该节点里最后一个字符，返回其后一个下标
+      let last = -1;
+      for (let k = 0; k < chars.length; k++) {
+        if (chars[k].node === node) last = k;
+      }
+      if (last >= 0 && offset === lastOffsetInNode(chars, node) + 1) return last + 1;
+    }
+    return -1;
+  }
+
+  // 某文本节点在 chars 里最后一个字符的节点内偏移（不存在返回 -1）
+  function lastOffsetInNode(chars, node) {
+    let last = -1;
+    for (let k = 0; k < chars.length; k++) {
+      if (chars[k].node === node && chars[k].offset > last) last = chars[k].offset;
+    }
+    return last;
+  }
+
+  // 主定位：用选区位置把 DOM 文字映射回源码。
+  // 成功返回 { norm, start, len, trimmed }；无法安全定位时返回 null（调用方回落到旧逻辑）。
+  function locateBySelectionOffset(range, norm, lines, block, lineIndex) {
+    if (!block || lineIndex == null) return null;
+
+    // 段内多行：块首行 = lineIndex，块内每行源码用 <br> 分隔。
+    // 先取该块的源码行范围（data-source-end 决定末行；缺失时向下找到空行/结构行为止）
+    const blockEndAttr = block.getAttribute ? block.getAttribute('data-source-end') : null;
+    let lastLine = blockEndAttr != null ? parseInt(blockEndAttr, 10) : lineIndex;
+    if (isNaN(lastLine) || lastLine < lineIndex) lastLine = lineIndex;
+    if (lastLine >= lines.length) lastLine = lines.length - 1;
+
+    // 选区必须完整落在这个块内，否则位置映射不成立
+    const chars = collectVisibleText(block);
+    if (!chars.length) return null;
+    const si = domPointToIndex(chars, range.startContainer, range.startOffset, false);
+    const ei = domPointToIndex(chars, range.endContainer, range.endOffset, true);
+    if (si < 0 || ei < 0 || ei <= si) return null;
+
+    // 逐行尝试：把每一行映射成 DOM 文字，看选区的字符区间落在哪一行/哪几段里。
+    // 段内多行时 DOM 文字是各行文字首尾相接（<br> 不产生字符），
+    // 所以按行顺序累加长度即可定位到具体行。
+    let consumed = 0;
+    for (let li = lineIndex; li <= lastLine; li++) {
+      const raw = lines[li];
+      // 去掉行首的块标记（列表项 "- "、引用 "> "、有序列表 "1. "、标题 "# " 等），
+      // 它们在 DOM 里不产生文字。
+      const stripped = raw.replace(/^\s*(?:[-*+]|\d+\.)\s+/, '').replace(/^\s*>\s?/, '');
+      const leadSkip = raw.length - stripped.length;
+      const map = buildDomToSourceMap(stripped);
+      const segLen = map.text.length;
+      if (segLen === 0) { consumed += 0; continue; }
+
+      // 选区与本行的 DOM 字符区间有交集？
+      const lo = Math.max(si, consumed);
+      const hi = Math.min(ei, consumed + segLen);
+      if (hi > lo) {
+        const a = lo - consumed;          // 本行内的起点
+        const b = hi - consumed;          // 本行内的终点（不含）
+        if (a >= map.pos.length || b - 1 >= map.pos.length) return null;
+        const total = lineBaseOffset(lines, li);   // 本行行首在全文中的偏移
+        const srcStart = total + leadSkip + map.pos[a];
+        const srcEnd = total + leadSkip + map.pos[b - 1] + 1;
+        const rawSpan = norm.substring(srcStart, srcEnd);
+        const trimmed = rawSpan.trim();
+        if (!trimmed) return null;
+        // 匹配串首尾若含空白，把起点推进到真正的内容处
+        const lead = rawSpan.indexOf(trimmed);
+        return {
+          norm: norm,
+          start: srcStart + lead,
+          len: trimmed.length,
+          trimmed: trimmed
+        };
+      }
+      consumed += segLen;
+    }
+    return null;
+  }
+
+  // 第 li 行行首在全文（norm）中的偏移
+  function lineBaseOffset(lines, li) {
+    let n = 0;
+    for (let k = 0; k < li; k++) n += lines[k].length + 1;   // +1 是换行符
+    return n;
+  }
+
   function captureSelectionRange() {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return null;
@@ -2714,6 +2880,20 @@
     let match = null;
     let scopeBase = 0; // 匹配范围起点在全文（norm）中的偏移
     const block = el.closest ? el.closest('[data-source-line]') : null;
+
+    // ---- 首选：按「选区在块内的字符偏移」精确定位（v1.1.09）----
+    // 位置天然唯一，同一行里出现两次相同文字也能区分开。
+    if (block && block.tagName !== 'PRE') {
+      const lineIndex0 = parseInt(block.getAttribute('data-source-line'), 10);
+      if (!isNaN(lineIndex0) && lineIndex0 >= 0 && lineIndex0 < lines.length) {
+        const located = locateBySelectionOffset(range, norm, lines, block, lineIndex0);
+        if (located) return located;
+      }
+    }
+
+    // ---- 回退：按文字内容在源码里搜（仅当位置映射不适用时）----
+    // 例如选区横跨多个块、或块结构不是 data-source-line 能描述的
+    // （表格单元格、嵌套列表等）——这时位置映射不保证成立，仍用内容搜索。
     if (block && block.tagName !== 'PRE') {
       const lineIndex = parseInt(block.getAttribute('data-source-line'), 10);
       if (!isNaN(lineIndex) && lineIndex >= 0 && lineIndex < lines.length) {
@@ -7161,7 +7341,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.08)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.09)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

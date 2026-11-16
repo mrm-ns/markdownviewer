@@ -174,6 +174,40 @@ function cmdSnapshot() {
 //      此时用「子序列包含」判定，并报告被替换的 bindEvents 原签名行。
 //
 // 原始文件来源：backup/_orig_check/js/app.js（从拆分前的版本备份解压得到）。
+// 解析比对基线，返回「js/app.js 内容的文件路径」；找不到返回 null。
+// 支持两种来源：
+//   1. --baseline <zip>   直接从备份 zip 里读出 js/app.js（无需解压）
+//   2. 默认               backup/_orig_check/js/app.js（传统用法，已解压的目录）
+function resolveBaseline() {
+  const idx = process.argv.indexOf('--baseline');
+  const spec = idx >= 0 ? process.argv[idx + 1] : null;
+  if (!spec) {
+    const p = path.join(ROOT, 'backup', '_orig_check', 'js', 'app.js');
+    return fs.existsSync(p) ? p : null;
+  }
+  const abs = path.isAbsolute(spec) ? spec : path.join(ROOT, spec);
+  if (!fs.existsSync(abs)) return null;
+  // zip：解出 js/app.js 到临时文件后再读
+  if (/\.zip$/i.test(abs)) {
+    const os = require('os');
+    const tmp = path.join(os.tmpdir(), 'md_baseline_' + process.pid + '.js');
+    // 用 PowerShell 解压（项目不引入第三方 zip 库；Windows 自带 Expand-Archive）
+    const r = require('child_process').spawnSync('powershell', [
+      '-NoProfile', '-Command',
+      "Expand-Archive -LiteralPath '" + abs.replace(/'/g, "''") + "' -DestinationPath '" +
+      path.join(os.tmpdir(), 'md_baseline_' + process.pid) + "' -Force"
+    ], { stdio: 'ignore' });
+    const extracted = path.join(os.tmpdir(), 'md_baseline_' + process.pid, 'js', 'app.js');
+    if (r.status === 0 && fs.existsSync(extracted)) {
+      fs.copyFileSync(extracted, tmp);
+      try { fs.rmSync(path.dirname(extracted), { recursive: true, force: true }); } catch (e) { /* 清理失败不影响结果 */ }
+      return tmp;
+    }
+    return null;
+  }
+  return abs;   // 直接给的 .js 文件
+}
+
 function cmdCheckAll() {
   const frags = fs.existsSync(SRC_DIR)
     ? fs.readdirSync(SRC_DIR).filter(function (f) { return f.endsWith('.js'); }).sort()
@@ -183,10 +217,15 @@ function cmdCheckAll() {
     return fs.readFileSync(path.join(SRC_DIR, f), 'utf8').replace(/\r\n/g, '\n').replace(/\n+$/, '');
   });
   const bundled = parts.join('\n') + '\n';
-  const origPath = path.join(ROOT, 'backup', '_orig_check', 'js', 'app.js');
-  if (!fs.existsSync(origPath)) {
-    console.log('找不到原始文件基线: ' + origPath);
+  // 基线可以是解压出来的目录，也可以直接指一个 zip（--baseline 指定；默认 v1.0.72）。
+  // 允许换基线是为了让校验聚焦「本次改动」：项目已经改了多个版本后，
+  // 拿最早的 v1.0.72 当基线会把历次有意修改都报成「找不到」，噪声淹没真问题。
+  const origPath = resolveBaseline();
+  if (!origPath) {
+    console.log('找不到原始文件基线。');
+    console.log('默认位置: backup/_orig_check/js/app.js');
     console.log('（从拆分前的备份解压得到，例如 Expand-Archive backup/markdown-viewer-v1.0.72.zip）');
+    console.log('也可以直接指定 zip: node tools/split_app.js --checkall --baseline backup/markdown-viewer-v1.1.08.zip');
     process.exitCode = 1;
     return;
   }
