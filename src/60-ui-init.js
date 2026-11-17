@@ -535,6 +535,16 @@
           });
         }
 
+      // 代码块注释是否斜体（默认正体：斜体对中文注释反而更难读）
+      const commentItalicToggle = document.getElementById('comment-italic-toggle');
+      if (commentItalicToggle) {
+        commentItalicToggle.addEventListener('change', function () {
+          state.settings.commentItalic = this.checked;
+          applySettings();
+          saveSettings();
+        });
+      }
+
       // 图片背景：开关 + 颜色（暗色主题下透明图片没有背景会看不清，默认开启白底）
       const imageBgToggle = document.getElementById('image-background-toggle');
       if (imageBgToggle) {
@@ -1635,7 +1645,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.10)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.11)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

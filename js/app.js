@@ -658,6 +658,10 @@
       textSize: 16,
       codeSize: 13.5,
       inlineCodeSize: 12,
+      // 代码块注释是否斜体：默认关闭（正体）。
+      // 斜体只对拉丁字母明显，中文注释被强制倾斜后反而更难读，
+      // 所以默认正体，需要的人可在「主题 → 阅读设置」里打开。
+      commentItalic: false,
       // 图片背景：透明 PNG / SVG（截图、流程图、公式图）在暗色主题下没有底板会看不清，
       // 默认给所有正文图片铺一层白底；用户可在「主题 → 阅读设置」里改色或关闭
       imageBackground: true,
@@ -1631,7 +1635,12 @@
     const logoPlan = pdfLogoVerticalPlan(L);
     const logoW = logoPlan.width;
     // 代码块语法配色来自 PDF 配色（state.pdfColors 已含完整语法色），可单独配置
-    const cssVars = themeCss({ colors: C, isDark: false, customCSS: '' });
+    // 注释斜体是阅读器设置（不是 PDF 版式字段），这里显式透传，避免隐式读全局
+    const cssVars = themeCss({
+      colors: C,
+      isDark: false,
+      customCSS: ''
+    }, { commentItalic: state.settings.commentItalic });
     const bodyFont = PDF_FONT_PRESETS.body[L.bodyFont] || PDF_FONT_PRESETS.body.system;
     const codeFont = PDF_FONT_PRESETS.code[L.codeFont] || PDF_FONT_PRESETS.code.mono;
     // 标题档位在 JS 里算好再写 em，不用 calc()（prince 对 calc 的支持不可依赖）
@@ -5158,8 +5167,16 @@
   }
 
   // ---------- 主题生成 ----------
-  function themeCss(theme) {
+  // opts.commentItalic：代码块注释是否斜体。
+  // 为什么要显式传参而不是直接读 state.settings：
+  //   buildPdfCss() 会带着**PDF 配色**调用本函数，若在这里隐式读全局设置，
+  //   「谁决定了输出」就藏在函数体里，调用方无法表达自己的意图。
+  // 传 undefined 时回落 state.settings.commentItalic（阅读器路径不传参即可）。
+  function themeCss(theme, opts) {
     const colors = theme.colors;
+    const commentItalic = (opts && opts.commentItalic !== undefined)
+      ? !!opts.commentItalic
+      : !!(state.settings && state.settings.commentItalic);
     const vars = COLOR_DEFS.map(function (def) {
       return '--md-' + def[0] + ': ' + colors[def[0]] + ';';
     }).join('\n');
@@ -5179,7 +5196,7 @@
       '  color: var(--md-codeText);',
       '}',
       '',
-      '.markdown-body .hljs-comment, .markdown-body .hljs-quote { color: var(--md-comment); font-style: italic; }',
+      '.markdown-body .hljs-comment, .markdown-body .hljs-quote { color: var(--md-comment); font-style: ' + (commentItalic ? 'italic' : 'normal') + '; }',
       '.markdown-body .hljs-keyword, .markdown-body .hljs-doctag { color: var(--md-keyword); }',
       '.markdown-body .hljs-selector-tag { color: var(--md-selectorTag); }',
       '.markdown-body .hljs-literal { color: var(--md-literal); }',
@@ -5361,6 +5378,12 @@
           textSize: Number(parsed.textSize) || 16,
           codeSize: Number(parsed.codeSize) || 13.5,
             inlineCodeSize: Number(parsed.inlineCodeSize) || 12,
+          // 代码块注释是否斜体：**只在显式存过 true 时才算开启**。
+          // 与下面 imageBackground 的写法相反，因为默认值相反：
+          // 老版本设置里没有这个字段，用 Boolean() 会得到 false，
+          // 恰好等于新默认值「正体」，所以这里必须用 === true
+          //（若写成 parsed.commentItalic !== false，老用户升级后会被判成「斜体」）。
+          commentItalic: parsed.commentItalic === true,
           // 图片背景：默认开启白底。
           // 只在显式存过 false 时才关闭（用 !== false 而不是 Boolean()，
           // 这样老版本设置里没有这个字段时，升级后按默认「开启」处理）
@@ -5406,6 +5429,9 @@
     // 背景必须与图片**完全贴合**：留内边距会像「相框把图片包起来」，
     // 所以这里恒为 0（保留变量是为了样式表里有一处可覆盖的入口）。
     root.style.setProperty('--md-image-padding', '0px');
+    // 注释斜体是写在 themeCss 生成的那段 CSS 里的（不是 CSS 变量），
+    // 所以改设置后必须重新生成主题样式，否则开关要等切主题才生效。
+    applyTheme();
   }
 
   function renderSettingsEditor() {
@@ -5415,6 +5441,8 @@
     if (textInput) textInput.value = state.settings.textSize;
     if (codeInput) codeInput.value = state.settings.codeSize;
     if (inlineCodeInput) inlineCodeInput.value = state.settings.inlineCodeSize;
+    const commentItalicToggle = document.getElementById('comment-italic-toggle');
+    if (commentItalicToggle) commentItalicToggle.checked = !!state.settings.commentItalic;
     const imageBgToggle = document.getElementById('image-background-toggle');
     const imageBgColor = document.getElementById('image-background-color');
     if (imageBgToggle) imageBgToggle.checked = !!state.settings.imageBackground;
@@ -6283,6 +6311,16 @@
             }
           });
         }
+
+      // 代码块注释是否斜体（默认正体：斜体对中文注释反而更难读）
+      const commentItalicToggle = document.getElementById('comment-italic-toggle');
+      if (commentItalicToggle) {
+        commentItalicToggle.addEventListener('change', function () {
+          state.settings.commentItalic = this.checked;
+          applySettings();
+          saveSettings();
+        });
+      }
 
       // 图片背景：开关 + 颜色（暗色主题下透明图片没有背景会看不清，默认开启白底）
       const imageBgToggle = document.getElementById('image-background-toggle');
@@ -7384,7 +7422,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.10)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.11)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

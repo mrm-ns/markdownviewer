@@ -451,7 +451,12 @@
     const logoPlan = pdfLogoVerticalPlan(L);
     const logoW = logoPlan.width;
     // 代码块语法配色来自 PDF 配色（state.pdfColors 已含完整语法色），可单独配置
-    const cssVars = themeCss({ colors: C, isDark: false, customCSS: '' });
+    // 注释斜体是阅读器设置（不是 PDF 版式字段），这里显式透传，避免隐式读全局
+    const cssVars = themeCss({
+      colors: C,
+      isDark: false,
+      customCSS: ''
+    }, { commentItalic: state.settings.commentItalic });
     const bodyFont = PDF_FONT_PRESETS.body[L.bodyFont] || PDF_FONT_PRESETS.body.system;
     const codeFont = PDF_FONT_PRESETS.code[L.codeFont] || PDF_FONT_PRESETS.code.mono;
     // 标题档位在 JS 里算好再写 em，不用 calc()（prince 对 calc 的支持不可依赖）

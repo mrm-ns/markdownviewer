@@ -1,6 +1,14 @@
   // ---------- 主题生成 ----------
-  function themeCss(theme) {
+  // opts.commentItalic：代码块注释是否斜体。
+  // 为什么要显式传参而不是直接读 state.settings：
+  //   buildPdfCss() 会带着**PDF 配色**调用本函数，若在这里隐式读全局设置，
+  //   「谁决定了输出」就藏在函数体里，调用方无法表达自己的意图。
+  // 传 undefined 时回落 state.settings.commentItalic（阅读器路径不传参即可）。
+  function themeCss(theme, opts) {
     const colors = theme.colors;
+    const commentItalic = (opts && opts.commentItalic !== undefined)
+      ? !!opts.commentItalic
+      : !!(state.settings && state.settings.commentItalic);
     const vars = COLOR_DEFS.map(function (def) {
       return '--md-' + def[0] + ': ' + colors[def[0]] + ';';
     }).join('\n');
@@ -20,7 +28,7 @@
       '  color: var(--md-codeText);',
       '}',
       '',
-      '.markdown-body .hljs-comment, .markdown-body .hljs-quote { color: var(--md-comment); font-style: italic; }',
+      '.markdown-body .hljs-comment, .markdown-body .hljs-quote { color: var(--md-comment); font-style: ' + (commentItalic ? 'italic' : 'normal') + '; }',
       '.markdown-body .hljs-keyword, .markdown-body .hljs-doctag { color: var(--md-keyword); }',
       '.markdown-body .hljs-selector-tag { color: var(--md-selectorTag); }',
       '.markdown-body .hljs-literal { color: var(--md-literal); }',
@@ -202,6 +210,12 @@
           textSize: Number(parsed.textSize) || 16,
           codeSize: Number(parsed.codeSize) || 13.5,
             inlineCodeSize: Number(parsed.inlineCodeSize) || 12,
+          // 代码块注释是否斜体：**只在显式存过 true 时才算开启**。
+          // 与下面 imageBackground 的写法相反，因为默认值相反：
+          // 老版本设置里没有这个字段，用 Boolean() 会得到 false，
+          // 恰好等于新默认值「正体」，所以这里必须用 === true
+          //（若写成 parsed.commentItalic !== false，老用户升级后会被判成「斜体」）。
+          commentItalic: parsed.commentItalic === true,
           // 图片背景：默认开启白底。
           // 只在显式存过 false 时才关闭（用 !== false 而不是 Boolean()，
           // 这样老版本设置里没有这个字段时，升级后按默认「开启」处理）
@@ -247,6 +261,9 @@
     // 背景必须与图片**完全贴合**：留内边距会像「相框把图片包起来」，
     // 所以这里恒为 0（保留变量是为了样式表里有一处可覆盖的入口）。
     root.style.setProperty('--md-image-padding', '0px');
+    // 注释斜体是写在 themeCss 生成的那段 CSS 里的（不是 CSS 变量），
+    // 所以改设置后必须重新生成主题样式，否则开关要等切主题才生效。
+    applyTheme();
   }
 
   function renderSettingsEditor() {
@@ -256,6 +273,8 @@
     if (textInput) textInput.value = state.settings.textSize;
     if (codeInput) codeInput.value = state.settings.codeSize;
     if (inlineCodeInput) inlineCodeInput.value = state.settings.inlineCodeSize;
+    const commentItalicToggle = document.getElementById('comment-italic-toggle');
+    if (commentItalicToggle) commentItalicToggle.checked = !!state.settings.commentItalic;
     const imageBgToggle = document.getElementById('image-background-toggle');
     const imageBgColor = document.getElementById('image-background-color');
     if (imageBgToggle) imageBgToggle.checked = !!state.settings.imageBackground;
