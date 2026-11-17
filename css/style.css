@@ -674,6 +674,23 @@ body.sidebar-collapsed .sidebar {
   text-overflow: ellipsis;
 }
 
+/* 文件类型图标（SVG）：固定尺寸、不参与收缩，保证与文件名基线对齐 */
+.file-item .file-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 18px;
+  line-height: 1;
+}
+
+.file-icon .file-icon-svg {
+  display: block;
+  width: 16px;
+  height: 18px;
+}
+
 .file-item .file-path {
   font-size: 11px;
   color: var(--muted);

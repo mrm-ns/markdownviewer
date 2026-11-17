@@ -548,9 +548,13 @@
     });
     node.files.forEach(function (f) {
       const active = f.path === state.currentPath ? ' active' : '';
+      // 按文件类型显示图标；file-icons.js 未加载时回退为通用文档 emoji
+      const icon = (typeof window.MD_FILE_ICON_HTML === 'function')
+        ? window.MD_FILE_ICON_HTML(f.name)
+        : '📄';
       html += '<li>' +
         '<div class="file-item' + active + '" data-path="' + escapeHtml(f.path) + '">' +
-          '<span class="file-icon">📄</span>' +
+          '<span class="file-icon">' + icon + '</span>' +
           '<span class="file-name">' + escapeHtml(f.name) + '</span>' +
         '</div>' +
       '</li>';

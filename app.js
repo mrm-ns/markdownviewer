@@ -28,7 +28,8 @@
   'js/promql.js',
 	'js/apache.js',
     'js/text.js',
-    'js/sql.js'
+    'js/sql.js',
+    'js/file-icons.js'
   ];
 
   function showFatalError(message) {
