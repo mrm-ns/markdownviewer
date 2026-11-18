@@ -62,7 +62,10 @@ if icon_hash.lower() != expected:
 
 print('图标哈希校验通过，开始备份...')
 
-# ---------- 自动收集所有文件（排除 backup 目录） ----------
+# ---------- 自动收集所有文件（排除 backup 目录与构建产物） ----------
+# 构建产物（packup.py 生成的便携版 zip）是「打包出来的东西」，不属于源码快照：
+# 留在里面会让每份备份都白胖 300KB 以上，也会随备份一路传下去。
+SKIP_ROOT_FILES = {'markdown-viewer-portable.zip'}
 files_to_pack = []
 
 for root, dirs, files in os.walk(BASE):
@@ -75,6 +78,10 @@ for root, dirs, files in os.walk(BASE):
         rel_path = os.path.relpath(full_path, BASE)
         # 额外安全过滤：确保不会意外包含 backup 目录下的文件（理论上不会，因为 dirs 已跳过）
         if rel_path.startswith('backup' + os.sep) or rel_path == 'backup':
+            continue
+        # 根目录下的构建产物：跳过
+        if fname in SKIP_ROOT_FILES and root == BASE:
+            print(f'skipped: {rel_path}（构建产物，不入备份）')
             continue
         files_to_pack.append(rel_path)
 
