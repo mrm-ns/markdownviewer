@@ -904,7 +904,8 @@
     applySourceChange(next.join('\n'));
     toast(delta > 0 ? '已右移一级（+2 空格）' : '已左移一级（-2 空格）');
     // 重渲染后 el 已被替换，只能用行号回定位，保持刚才那一项在视野内
-    setTimeout(function () { scrollToSourceLine(startLine); }, 0);
+    // keepInView：本来就在视野内就不滚动，避免把该项硬拉到视口顶端
+    setTimeout(function () { scrollToSourceLine(startLine, { keepInView: true }); }, 0);
     return true;
   }
   // === BLOCK_INDENT_END ===
@@ -964,7 +965,9 @@
     applySourceChange(nextText);
     toast('已删除该块' + (absorbed ? '（连同列表项之间的空行）' : ''));
     // 重渲染后 el 已被替换，只能用行号回定位，保持删除位置在视野内
-    setTimeout(function () { scrollToSourceLine(startLine); }, 0);
+    // keepInView：删除后紧跟的那一块本来就在视野内时不滚动
+    // （旧行为会用 block:'start' 把它硬拉到视口顶端 —— 这正是用户报告的滚动跳动）
+    setTimeout(function () { scrollToSourceLine(startLine, { keepInView: true }); }, 0);
     return true;
   }
   // === BLOCK_DELETE_END ===
@@ -1239,8 +1242,10 @@
 
       if (wrap.parentNode) wrap.remove();
       applySourceChange(lines.join('\n'));
-      // 渲染完成后定位并闪烁提示新插入的块
-      setTimeout(function () { scrollToSourceLine(firstContentLine); }, 0);
+      // 渲染完成后定位并闪烁提示新插入的块。
+      // keepInView：插入点通常是用户当前正在看的位置，新块已可见时不要再滚动，
+      // 否则会把整个页面推一下（旧行为用 block:'start' 把它顶到最上沿）。
+      setTimeout(function () { scrollToSourceLine(firstContentLine, { keepInView: true }); }, 0);
       toast((kind === 'code' ? '已插入代码块' : '已插入文本块') + (indentOne ? '（已缩进一级）' : ''));
     }
 

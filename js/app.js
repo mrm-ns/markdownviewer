@@ -2531,7 +2531,15 @@
 
   // ---------- 搜索结果跳转 ----------
   // 在渲染后的正文中滚动到源码行：取 data-source-line ≤ lineIndex 的最大元素
-  function scrollToSourceLine(lineIndex) {
+  //
+  // opts.keepInView（v1.1.17）：
+  //   编辑 / 删除 / 插入 / 缩进后回定位用 true —— **只在目标确实跑出视口时才滚动**，
+  //   目标本来就在视野内则**一个像素都不动**。
+  //   旧实现一律 scrollIntoView({ block: 'start' })，语义是「把目标顶到视口最上沿」，
+  //   于是每次增删块都会把那一块硬拉到页面顶端、滚动条大幅跳动（用户报告的「闪屏」）。
+  //   搜索结果跳转仍用默认的 false —— 那种场景用户就是要「跳过去」，顶到顶端是合理的。
+  function scrollToSourceLine(lineIndex, opts) {
+    const keepInView = !!(opts && opts.keepInView);
     const body = document.getElementById('markdown-body');
     let target = null;
     let best = -1;
@@ -2559,7 +2567,16 @@
       if (totalLines > 1) {
         const ratio = Math.max(0, Math.min(1, lineIndex / (totalLines - 1)));
         const scrollParent = contentEl || document.scrollingElement;
-        if (scrollParent) {
+        // keepInView 时同样只在目标行跑出视口才滚动（代码文件整块占位很高，
+        // 一律 scrollTo 会导致每次编辑都把视口拉到该块的中段）
+        let needScroll = true;
+        if (keepInView && scrollParent) {
+          const targetTop = target.offsetTop + ratio * target.offsetHeight;
+          const viewTop = scrollParent.scrollTop;
+          const viewBottom = viewTop + (scrollParent.clientHeight || window.innerHeight);
+          needScroll = targetTop < viewTop + 24 || targetTop > viewBottom - 24;
+        }
+        if (needScroll && scrollParent) {
           const targetTop = target.offsetTop + ratio * target.offsetHeight;
           scrollParent.scrollTo({ top: Math.max(0, targetTop - 24), behavior: 'smooth' });
         }
@@ -2581,6 +2598,21 @@
     setTimeout(function () {
       target.classList.remove('jump-flash');
     }, 1800);
+
+    if (keepInView) {
+      // 编辑 / 删除 / 插入场景：目标还在视野里就什么都不做。
+      // 判定用视口矩形而非 scrollTop 计算，这样无论滚动容器是 .content 还是窗口都成立。
+      const rect = target.getBoundingClientRect();
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      // 上下各留 24px 余量，避免元素边缘贴着视口边、看起来像被切掉
+      const margin = 24;
+      const fullyVisible = rect.top >= margin && rect.bottom <= vh - margin;
+      if (fullyVisible) return;
+      // 只有真的看不见才滚动，且用 nearest —— 能少滚就少滚，不做「顶到最上沿」
+      target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -4256,7 +4288,8 @@
     applySourceChange(next.join('\n'));
     toast(delta > 0 ? '已右移一级（+2 空格）' : '已左移一级（-2 空格）');
     // 重渲染后 el 已被替换，只能用行号回定位，保持刚才那一项在视野内
-    setTimeout(function () { scrollToSourceLine(startLine); }, 0);
+    // keepInView：本来就在视野内就不滚动，避免把该项硬拉到视口顶端
+    setTimeout(function () { scrollToSourceLine(startLine, { keepInView: true }); }, 0);
     return true;
   }
   // === BLOCK_INDENT_END ===
@@ -4316,7 +4349,9 @@
     applySourceChange(nextText);
     toast('已删除该块' + (absorbed ? '（连同列表项之间的空行）' : ''));
     // 重渲染后 el 已被替换，只能用行号回定位，保持删除位置在视野内
-    setTimeout(function () { scrollToSourceLine(startLine); }, 0);
+    // keepInView：删除后紧跟的那一块本来就在视野内时不滚动
+    // （旧行为会用 block:'start' 把它硬拉到视口顶端 —— 这正是用户报告的滚动跳动）
+    setTimeout(function () { scrollToSourceLine(startLine, { keepInView: true }); }, 0);
     return true;
   }
   // === BLOCK_DELETE_END ===
@@ -4591,8 +4626,10 @@
 
       if (wrap.parentNode) wrap.remove();
       applySourceChange(lines.join('\n'));
-      // 渲染完成后定位并闪烁提示新插入的块
-      setTimeout(function () { scrollToSourceLine(firstContentLine); }, 0);
+      // 渲染完成后定位并闪烁提示新插入的块。
+      // keepInView：插入点通常是用户当前正在看的位置，新块已可见时不要再滚动，
+      // 否则会把整个页面推一下（旧行为用 block:'start' 把它顶到最上沿）。
+      setTimeout(function () { scrollToSourceLine(firstContentLine, { keepInView: true }); }, 0);
       toast((kind === 'code' ? '已插入代码块' : '已插入文本块') + (indentOne ? '（已缩进一级）' : ''));
     }
 
@@ -7450,7 +7487,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.16)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.17)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
