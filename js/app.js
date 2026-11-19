@@ -798,7 +798,8 @@
     { className: 'number', pattern: /\b\d{1,3}(?:\.\d{1,3}){3}\b|\b\d+(?:\.\d+)?\b/ },
     { className: 'variable', pattern: /\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/ },
     { className: 'attribute', pattern: /^\s*[A-Za-z_][A-Za-z0-9_.-]*/ },
-    { className: 'string', pattern: /(?<=\S)\s+[A-Za-z_][A-Za-z0-9_.\/:@-]*/ }
+    // [^\S\n] 而非 \s：\s 含 \n 会跨行吃掉下一行关键字（详见 AGENTS §6.18）
+    { className: 'string', pattern: /(?<=\S)[^\S\n]+[A-Za-z_][A-Za-z0-9_.\/:@-]*/ }
   ];
 
   function detectLanguage(code) {
@@ -2673,12 +2674,22 @@
     if (state.undoStack.length > 20) state.undoStack.shift();
     state.currentText = newText;
 
+    // 重渲染会整体重建 #markdown-body 的 DOM（renderMarkdown 里是 innerHTML = ...），
+    // 滚动容器 .content 的 scrollTop 因此在重建瞬间被清零，表现为「编辑/删除后页面跳到顶部再弹回」的闪屏。
+    // 过去靠调用方在 applySourceChange 之后用 setTimeout + scrollToSourceLine 补救，
+    // 但那是「先跳走、下一帧再拉回」，闪屏依然可见。
+    // 正确做法：在这里就地跨渲染保存并恢复滚动位置（同步恢复，不经过帧调度）。
+    const savedScroll = captureContentScroll();
+
     // 渲染失败（任何内容）不应阻断保存：无论如何都要尝试写回磁盘
     try {
       renderMarkdown(newText);
     } catch (e) {
       console.error('[Markdown Viewer] 渲染失败，但仍尝试保存修改', e);
     }
+
+    // 立刻恢复滚动位置：DOM 已重建完成，此处同步写回不会产生可见跳动
+    restoreContentScroll(savedScroll);
 
     // 写入结果按实际去向提示：'disk'（已写回磁盘）/ 'cache'（已写入浏览器缓存）/ false（仅内存）
     writeCurrentTextToDisk(newText).then(function (result) {
@@ -3300,7 +3311,10 @@
       finished = true;
       const newValue = textarea.value.replace(/\n$/, '');
       if (newValue === oldRaw) {
+          // 跨渲染保存/恢复滚动，避免「未修改也闪一下」
+          const saved = captureContentScroll();
           renderMarkdown(state.currentText);
+          restoreContentScroll(saved);
           return;
         }
       const lines = state.currentText.split('\n');
@@ -3618,7 +3632,10 @@
       finished = true;
       const newCode = textarea.value.replace(/\n$/, '');
         if (newCode === oldCode) {
+            // 跨渲染保存/恢复滚动，避免「未修改也闪一下」
+            const saved = captureContentScroll();
             renderMarkdown(state.currentText);
+            restoreContentScroll(saved);
             return;
           }
       const lines = state.currentText.split('\n');
@@ -3693,7 +3710,10 @@
       finished = true;
       const newText = textarea.value.replace(/\r\n/g, '\n');
       if (newText === oldText) {
+        // 跨渲染保存/恢复滚动，避免「未修改也闪一下」
+        const saved = captureContentScroll();
         renderMarkdown(state.currentText);
+        restoreContentScroll(saved);
         return;
       }
       applySourceChange(newText); // 整个文件内容替换
@@ -3755,7 +3775,11 @@
       finished = true;
       const newValue = textarea.value.replace(/\n$/, '');
       if (newValue === oldRaw) {
+        // 内容没变：只需把编辑框还原成渲染结果。
+        // 这里同样要跨渲染保存/恢复滚动，否则「点开又原样收起」也会闪一下（见 applySourceChange 注释）。
+        const saved = captureContentScroll();
         renderMarkdown(state.currentText);
+        restoreContentScroll(saved);
         return;
       }
       const lines = state.currentText.split('\n');
@@ -7426,7 +7450,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.14)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.15)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

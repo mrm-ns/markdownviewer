@@ -86,7 +86,8 @@
     { className: 'number', pattern: /\b\d{1,3}(?:\.\d{1,3}){3}\b|\b\d+(?:\.\d+)?\b/ },
     { className: 'variable', pattern: /\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/ },
     { className: 'attribute', pattern: /^\s*[A-Za-z_][A-Za-z0-9_.-]*/ },
-    { className: 'string', pattern: /(?<=\S)\s+[A-Za-z_][A-Za-z0-9_.\/:@-]*/ }
+    // [^\S\n] 而非 \s：\s 含 \n 会跨行吃掉下一行关键字（详见 AGENTS §6.18）
+    { className: 'string', pattern: /(?<=\S)[^\S\n]+[A-Za-z_][A-Za-z0-9_.\/:@-]*/ }
   ];
 
   function detectLanguage(code) {

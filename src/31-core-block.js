@@ -280,7 +280,10 @@
       finished = true;
       const newCode = textarea.value.replace(/\n$/, '');
         if (newCode === oldCode) {
+            // 跨渲染保存/恢复滚动，避免「未修改也闪一下」
+            const saved = captureContentScroll();
             renderMarkdown(state.currentText);
+            restoreContentScroll(saved);
             return;
           }
       const lines = state.currentText.split('\n');
@@ -355,7 +358,10 @@
       finished = true;
       const newText = textarea.value.replace(/\r\n/g, '\n');
       if (newText === oldText) {
+        // 跨渲染保存/恢复滚动，避免「未修改也闪一下」
+        const saved = captureContentScroll();
         renderMarkdown(state.currentText);
+        restoreContentScroll(saved);
         return;
       }
       applySourceChange(newText); // 整个文件内容替换
@@ -417,7 +423,11 @@
       finished = true;
       const newValue = textarea.value.replace(/\n$/, '');
       if (newValue === oldRaw) {
+        // 内容没变：只需把编辑框还原成渲染结果。
+        // 这里同样要跨渲染保存/恢复滚动，否则「点开又原样收起」也会闪一下（见 applySourceChange 注释）。
+        const saved = captureContentScroll();
         renderMarkdown(state.currentText);
+        restoreContentScroll(saved);
         return;
       }
       const lines = state.currentText.split('\n');
