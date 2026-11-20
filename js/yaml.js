@@ -30,7 +30,7 @@
     // 冒号后的未加引号简单值（例如 URL、路径等）
     { className: 'unquoted', pattern: /(?<=:\s*)[A-Za-z_][A-Za-z0-9_.\/:@-]*/ },
     // 符号（注意：- 和 , 等会在列表项/数组中使用）
-    { className: 'symbol', pattern: /[>+*()@!~=|&;{}\[\]:?,-]/ }
+    { className: 'symbol', pattern: /[<>+*()@!~=|&;{}\[\]:?,-]/ }
   ];
 
   // 同时支持 yaml 和 yml

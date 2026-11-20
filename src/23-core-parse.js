@@ -408,6 +408,11 @@
   const PDF_LOGO_TOP_MIN_MM = 3; // 首页内容框上边距的下限（别让 logo 贴到纸边）
   function pdfLogoWidthMm(layout) {
     const L = normalizePdfLayout(layout);
+    // 唯一的水印开关点：用户在「PDF 主题 → 版式」里关掉 watermark → 返回 0 = 不印。
+    // 因为 pdfLogoVerticalPlan / buildPdfCss / buildPdfDocumentHtml 全都从「宽度」派生，
+    // 关掉时连 @page :first 与 body 的 padding-top 都不会出现 ——
+    // 版面回到与「从来没有水印」完全一致，不会留下 16mm 的空带。
+    if (!L.watermark) return 0;
     const avail = L.marginH - PDF_LOGO_RIGHT_MM - PDF_LOGO_GAP_MM;
     const w = Math.min(PDF_LOGO_MAX_MM, avail);
     // avail 为负（带宽不够摆下右边距+间隙）时同样落到这里 → 0 → 不印

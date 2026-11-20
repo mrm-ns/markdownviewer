@@ -187,6 +187,7 @@
 
   // 版式字段表：渲染输入框与校验共用一份定义（与 PDF_COLOR_DEFS 同一种声明式风格）
   // 'number' → [key, 标签, 'number', min, max, step]；'enum' → [key, 标签, 'enum', [[值, 标签], ...]]
+  // 'bool'   → [key, 标签, 'bool']（渲染成复选框）
   const PDF_LAYOUT_DEFS = [
     ['textSize', '正文字号（px）', 'number', 8, 32, 0.5],
     ['codeSize', '代码块字号（px）', 'number', 8, 32, 0.5],
@@ -198,7 +199,8 @@
     ['marginV', '页边距 上下（mm）', 'number', 0, 40, 1],
     ['marginH', '页边距 左右（mm）', 'number', 0, 40, 1],
     ['bodyFont', '正文字体', 'enum', [['system', '系统默认'], ['yahei', '微软雅黑 / 黑体'], ['songti', '宋体（serif）']]],
-    ['codeFont', '代码字体', 'enum', [['mono', '等宽（默认）'], ['consolas', 'Consolas'], ['cascadia', 'Cascadia Mono']]]
+    ['codeFont', '代码字体', 'enum', [['mono', '等宽（默认）'], ['consolas', 'Consolas'], ['cascadia', 'Cascadia Mono']]],
+    ['watermark', '右上角水印 logo', 'bool']
   ];
 
   const PDF_LAYOUT_DEFAULTS = {
@@ -212,7 +214,10 @@
     marginV: 20,
     marginH: 18,
     bodyFont: 'system',
-    codeFont: 'mono'
+    codeFont: 'mono',
+    // 默认**开**：老用户的 localStorage 里没有这个字段，normalize 会取默认值，
+    // 所以升级后行为与之前完全一致（突然没了水印会很奇怪）。
+    watermark: true
   };
 
   // 版式校验 + 夹取：任何来源（localStorage / 导入的 JSON / 手输）都必须过这一关。
@@ -243,6 +248,16 @@
       } else if (kind === 'enum') {
         const allowed = def[3].map(function (o) { return o[0]; });
         if (typeof value === 'string' && allowed.indexOf(value) >= 0) out[key] = value;
+      } else if (kind === 'bool') {
+        // 兼容三种来源：JSON 里的真布尔、手输/旧数据里的字符串、1/0。
+        // 认不出的值（如空串）一律保留默认值，不要瞎猜成 false。
+        if (typeof value === 'boolean') out[key] = value;
+        else if (value === 1 || value === 0) out[key] = value === 1;
+        else if (typeof value === 'string') {
+          const s = value.trim().toLowerCase();
+          if (s === 'true' || s === '1' || s === 'on') out[key] = true;
+          else if (s === 'false' || s === '0' || s === 'off') out[key] = false;
+        }
       }
     });
     return out;

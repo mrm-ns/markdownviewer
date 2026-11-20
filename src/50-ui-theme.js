@@ -356,7 +356,7 @@
     renderPdfLayoutEditor();
   }
 
-  // 版式编辑器：按 PDF_LAYOUT_DEFS 生成数字框 / 下拉框（与颜色编辑器同一套声明式风格）
+  // 版式编辑器：按 PDF_LAYOUT_DEFS 生成数字框 / 下拉框 / 复选框（与颜色编辑器同一套声明式风格）
   function renderPdfLayoutEditor() {
     const container = document.getElementById('pdf-layout-editor');
     if (!container) return;
@@ -366,6 +366,13 @@
       const kind = def[2];
       const value = state.pdfLayout[key];
       const labelHtml = '<span class="layout-name" title="' + escapeHtml(key) + '">' + escapeHtml(label) + '</span>';
+      if (kind === 'bool') {
+        // 整行用 <label> 包住：点文字也能勾选，与「阅读设置」里的开关手感一致
+        const checked = value ? ' checked' : '';
+        return '<label class="layout-row layout-row-check">' + labelHtml +
+          '<input type="checkbox" data-layout-key="' + escapeHtml(key) + '" aria-label="' + escapeHtml(label) + '"' +
+          checked + '></label>';
+      }
       if (kind === 'enum') {
         const options = def[3].map(function (o) {
           return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === value ? ' selected' : '') + '>' +
@@ -388,11 +395,18 @@
     if (!container) return;
     const raw = {};
     container.querySelectorAll('[data-layout-key]').forEach(function (input) {
-      raw[input.getAttribute('data-layout-key')] = input.value;
+      const key = input.getAttribute('data-layout-key');
+      // 复选框要读 checked，不能读 value（复选框的 value 恒为 'on'）
+      raw[key] = input.type === 'checkbox' ? input.checked : input.value;
     });
     state.pdfLayout = normalizePdfLayout(Object.assign({}, state.pdfLayout, raw));
     container.querySelectorAll('[data-layout-key]').forEach(function (input) {
       const key = input.getAttribute('data-layout-key');
+      if (input.type === 'checkbox') {
+        const want = !!state.pdfLayout[key];
+        if (input.checked !== want) input.checked = want;
+        return;
+      }
       const shown = String(state.pdfLayout[key]);
       if (input.value !== shown) input.value = shown;
     });

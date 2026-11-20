@@ -306,6 +306,7 @@
 
   // 版式字段表：渲染输入框与校验共用一份定义（与 PDF_COLOR_DEFS 同一种声明式风格）
   // 'number' → [key, 标签, 'number', min, max, step]；'enum' → [key, 标签, 'enum', [[值, 标签], ...]]
+  // 'bool'   → [key, 标签, 'bool']（渲染成复选框）
   const PDF_LAYOUT_DEFS = [
     ['textSize', '正文字号（px）', 'number', 8, 32, 0.5],
     ['codeSize', '代码块字号（px）', 'number', 8, 32, 0.5],
@@ -317,7 +318,8 @@
     ['marginV', '页边距 上下（mm）', 'number', 0, 40, 1],
     ['marginH', '页边距 左右（mm）', 'number', 0, 40, 1],
     ['bodyFont', '正文字体', 'enum', [['system', '系统默认'], ['yahei', '微软雅黑 / 黑体'], ['songti', '宋体（serif）']]],
-    ['codeFont', '代码字体', 'enum', [['mono', '等宽（默认）'], ['consolas', 'Consolas'], ['cascadia', 'Cascadia Mono']]]
+    ['codeFont', '代码字体', 'enum', [['mono', '等宽（默认）'], ['consolas', 'Consolas'], ['cascadia', 'Cascadia Mono']]],
+    ['watermark', '右上角水印 logo', 'bool']
   ];
 
   const PDF_LAYOUT_DEFAULTS = {
@@ -331,7 +333,10 @@
     marginV: 20,
     marginH: 18,
     bodyFont: 'system',
-    codeFont: 'mono'
+    codeFont: 'mono',
+    // 默认**开**：老用户的 localStorage 里没有这个字段，normalize 会取默认值，
+    // 所以升级后行为与之前完全一致（突然没了水印会很奇怪）。
+    watermark: true
   };
 
   // 版式校验 + 夹取：任何来源（localStorage / 导入的 JSON / 手输）都必须过这一关。
@@ -362,6 +367,16 @@
       } else if (kind === 'enum') {
         const allowed = def[3].map(function (o) { return o[0]; });
         if (typeof value === 'string' && allowed.indexOf(value) >= 0) out[key] = value;
+      } else if (kind === 'bool') {
+        // 兼容三种来源：JSON 里的真布尔、手输/旧数据里的字符串、1/0。
+        // 认不出的值（如空串）一律保留默认值，不要瞎猜成 false。
+        if (typeof value === 'boolean') out[key] = value;
+        else if (value === 1 || value === 0) out[key] = value === 1;
+        else if (typeof value === 'string') {
+          const s = value.trim().toLowerCase();
+          if (s === 'true' || s === '1' || s === 'on') out[key] = true;
+          else if (s === 'false' || s === '0' || s === 'off') out[key] = false;
+        }
       }
     });
     return out;
@@ -1593,6 +1608,11 @@
   const PDF_LOGO_TOP_MIN_MM = 3; // 首页内容框上边距的下限（别让 logo 贴到纸边）
   function pdfLogoWidthMm(layout) {
     const L = normalizePdfLayout(layout);
+    // 唯一的水印开关点：用户在「PDF 主题 → 版式」里关掉 watermark → 返回 0 = 不印。
+    // 因为 pdfLogoVerticalPlan / buildPdfCss / buildPdfDocumentHtml 全都从「宽度」派生，
+    // 关掉时连 @page :first 与 body 的 padding-top 都不会出现 ——
+    // 版面回到与「从来没有水印」完全一致，不会留下 16mm 的空带。
+    if (!L.watermark) return 0;
     const avail = L.marginH - PDF_LOGO_RIGHT_MM - PDF_LOGO_GAP_MM;
     const w = Math.min(PDF_LOGO_MAX_MM, avail);
     // avail 为负（带宽不够摆下右边距+间隙）时同样落到这里 → 0 → 不印
@@ -5589,7 +5609,7 @@
     renderPdfLayoutEditor();
   }
 
-  // 版式编辑器：按 PDF_LAYOUT_DEFS 生成数字框 / 下拉框（与颜色编辑器同一套声明式风格）
+  // 版式编辑器：按 PDF_LAYOUT_DEFS 生成数字框 / 下拉框 / 复选框（与颜色编辑器同一套声明式风格）
   function renderPdfLayoutEditor() {
     const container = document.getElementById('pdf-layout-editor');
     if (!container) return;
@@ -5599,6 +5619,13 @@
       const kind = def[2];
       const value = state.pdfLayout[key];
       const labelHtml = '<span class="layout-name" title="' + escapeHtml(key) + '">' + escapeHtml(label) + '</span>';
+      if (kind === 'bool') {
+        // 整行用 <label> 包住：点文字也能勾选，与「阅读设置」里的开关手感一致
+        const checked = value ? ' checked' : '';
+        return '<label class="layout-row layout-row-check">' + labelHtml +
+          '<input type="checkbox" data-layout-key="' + escapeHtml(key) + '" aria-label="' + escapeHtml(label) + '"' +
+          checked + '></label>';
+      }
       if (kind === 'enum') {
         const options = def[3].map(function (o) {
           return '<option value="' + escapeHtml(o[0]) + '"' + (o[0] === value ? ' selected' : '') + '>' +
@@ -5621,11 +5648,18 @@
     if (!container) return;
     const raw = {};
     container.querySelectorAll('[data-layout-key]').forEach(function (input) {
-      raw[input.getAttribute('data-layout-key')] = input.value;
+      const key = input.getAttribute('data-layout-key');
+      // 复选框要读 checked，不能读 value（复选框的 value 恒为 'on'）
+      raw[key] = input.type === 'checkbox' ? input.checked : input.value;
     });
     state.pdfLayout = normalizePdfLayout(Object.assign({}, state.pdfLayout, raw));
     container.querySelectorAll('[data-layout-key]').forEach(function (input) {
       const key = input.getAttribute('data-layout-key');
+      if (input.type === 'checkbox') {
+        const want = !!state.pdfLayout[key];
+        if (input.checked !== want) input.checked = want;
+        return;
+      }
       const shown = String(state.pdfLayout[key]);
       if (input.value !== shown) input.value = shown;
     });
@@ -7487,7 +7521,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.17)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.18)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

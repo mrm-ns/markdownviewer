@@ -1467,6 +1467,19 @@ body.sidebar-collapsed .sidebar {
   color: var(--app-fg);
 }
 
+/* 版式里的开关行（如「右上角水印 logo」）：整行可点，复选框靠右与上面的控件对齐 */
+.layout-row-check {
+  cursor: pointer;
+}
+
+.layout-row-check input[type="checkbox"] {
+  justify-self: end;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
 /* ===== PDF 样式预览（抽屉内） ===== */
 .pdf-preview-wrap {
   height: 260px;
