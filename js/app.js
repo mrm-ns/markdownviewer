@@ -680,7 +680,12 @@
       // 图片背景：透明 PNG / SVG（截图、流程图、公式图）在暗色主题下没有底板会看不清，
       // 默认给所有正文图片铺一层白底；用户可在「主题 → 阅读设置」里改色或关闭
       imageBackground: true,
-      imageBackgroundColor: '#ffffff'
+      imageBackgroundColor: '#ffffff',
+      // 正文里的外部链接是否在新窗口打开。
+      // 默认 false = 保持历史行为（当前窗口打开）。
+      // 只作用于阅读器里的点击（见 bindContentJumpEvents 的链接处理）；
+      // 导出的 HTML 不含这个开关的影响。
+      openLinksInNewTab: false
     },
     imageMap: {},       // path -> objectURL，用于相对路径图片
     dirHandle: null,    // File System Access API 的当前目录句柄
@@ -5473,7 +5478,11 @@
           // 只在显式存过 false 时才关闭（用 !== false 而不是 Boolean()，
           // 这样老版本设置里没有这个字段时，升级后按默认「开启」处理）
           imageBackground: parsed.imageBackground !== false,
-          imageBackgroundColor: normalizeCssColor(parsed.imageBackgroundColor) || '#ffffff'
+          imageBackgroundColor: normalizeCssColor(parsed.imageBackgroundColor) || '#ffffff',
+          // 外部链接是否新窗口打开：默认关闭，保持历史行为。
+          // 与 commentItalic 同理用 === true —— 老版本设置里没有这个字段，
+          // 若写成 !== false，老用户升级后会被判成「开启」，与默认值相反。
+          openLinksInNewTab: parsed.openLinksInNewTab === true
         };
       }
     } catch (e) {
@@ -5532,6 +5541,10 @@
     const imageBgColor = document.getElementById('image-background-color');
     if (imageBgToggle) imageBgToggle.checked = !!state.settings.imageBackground;
     if (imageBgColor) imageBgColor.value = state.settings.imageBackgroundColor || '#ffffff';
+    // 设置抽屉里的项也在这里回填：renderSettingsEditor() 是「设置 → 控件」的唯一出口，
+    // 新增设置项只要往这里加一行，两个抽屉打开时都会同步（见 AGENTS §6.15 第 6 条）
+    const openLinksToggle = document.getElementById('open-links-new-tab-toggle');
+    if (openLinksToggle) openLinksToggle.checked = !!state.settings.openLinksInNewTab;
   }
 
 
@@ -5861,6 +5874,7 @@
   }
 
   function openDrawer() {
+    closeSettingsDrawer();   // 两个右侧抽屉互斥，避免叠在一起
     document.getElementById('theme-drawer').classList.add('open');
     document.getElementById('theme-drawer').setAttribute('aria-hidden', 'false');
     setThemeMode(state.themeMode);
@@ -5872,6 +5886,32 @@
   function closeDrawer() {
     document.getElementById('theme-drawer').classList.remove('open');
     document.getElementById('theme-drawer').setAttribute('aria-hidden', 'true');
+  }
+
+  // ---------- 设置抽屉（标题栏齿轮按钮打开） ----------
+  // 与主题抽屉并列的第二个右侧抽屉，共用 .theme-drawer 那套 class 与控制方式。
+  // 用两个独立抽屉而不是往主题抽屉里塞：主题抽屉是「配色/版式」编辑器，
+  // 设置是「行为开关」，混在一起会让那个已经很高的抽屉更长。
+  function openSettingsDrawer() {
+    const drawer = document.getElementById('settings-drawer');
+    if (!drawer) return;
+    renderSettingsEditor();   // 打开前先回填，保证控件与 state 一致（不要只靠初始化时调一次）
+    drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeSettingsDrawer() {
+    const drawer = document.getElementById('settings-drawer');
+    if (!drawer) return;
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+  }
+
+  // 两个抽屉同时打开会叠在一起（都向右滑入、遮罩重叠，视觉上分不清在关哪个），
+  // 所以任一打开时先关掉另一个。
+  function openSettingsDrawerExclusive() {
+    closeDrawer();
+    openSettingsDrawer();
   }
 
   // ---------- 初始化 ----------
@@ -6046,6 +6086,24 @@
     document.getElementById('btn-theme').addEventListener('click', openDrawer);
     document.getElementById('btn-close-theme').addEventListener('click', closeDrawer);
     document.getElementById('drawer-mask').addEventListener('click', closeDrawer);
+
+    // 设置抽屉（标题栏齿轮）：开合 + 里面的行为开关
+    const btnSettings = document.getElementById('btn-settings');
+    const btnCloseSettings = document.getElementById('btn-close-settings');
+    const settingsMask = document.getElementById('settings-drawer-mask');
+    if (btnSettings) btnSettings.addEventListener('click', openSettingsDrawerExclusive);
+    if (btnCloseSettings) btnCloseSettings.addEventListener('click', closeSettingsDrawer);
+    if (settingsMask) settingsMask.addEventListener('click', closeSettingsDrawer);
+
+    // 外部链接是否在新窗口打开：纯行为开关，不需要重渲染 ——
+    // 判定发生在点击时（见 bindContentJumpEvents），改完立刻生效。
+    const openLinksToggle = document.getElementById('open-links-new-tab-toggle');
+    if (openLinksToggle) {
+      openLinksToggle.addEventListener('change', function () {
+        state.settings.openLinksInNewTab = this.checked;
+        saveSettings();
+      });
+    }
 
     fileInput.addEventListener('change', function () {
       if (fileInput.files.length) appendFiles(fileInput.files);
@@ -7370,7 +7428,30 @@
           const hashIndex = href.indexOf('#');
           const pathPart = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
           const anchor = hashIndex >= 0 ? href.slice(hashIndex + 1) : '';
-          if (!pathPart || /^(https?:|mailto:|tel:|data:|blob:)/i.test(pathPart)) return;
+
+          // data: / blob: 是页面内资源，不干预，交给浏览器默认行为
+          if (/^(data:|blob:)/i.test(pathPart)) return;
+
+          // 外部链接（http / https / mailto / tel）：
+          // 「设置 → 链接在新窗口打开」开启时，用 window.open 在新窗口打开。
+          //
+          // 为什么在**点击时**判定，而不是渲染时给 <a> 写 target="_blank"：
+          //   1) 改设置立刻生效，不必为改一个开关重渲染整篇文档（重渲染有滚动/闪屏代价，见 §6.18）；
+          //   2) 只影响阅读器，导出的 HTML 不会被带上 target，产物行为保持原样；
+          //   3) 按住 Ctrl / ⌘ / Shift / Alt 时交回浏览器，保留原生「新标签页 / 新窗口」语义，
+          //      否则会把用户本来想要的新标签页强行变成 window.open 的新窗口。
+          if (/^(https?:|mailto:|tel:)/i.test(pathPart)) {
+            if (!state.settings.openLinksInNewTab) return;   // 关闭时保持历史行为（当前窗口打开）
+            if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            // noopener/noreferrer：不把本页 window 交给目标页（安全），且不发送 Referer
+            const opened = window.open(href, '_blank', 'noopener,noreferrer');
+            // 弹窗被拦截时的兜底：退化为当前窗口打开，避免「点了没反应」
+            if (!opened) window.location.href = href;
+            return;
+          }
+
+          if (!pathPart) return;
 
           const targetPath = resolveWorkspacePath(pathPart);
           const target = state.files.find(function (f) {
@@ -7485,7 +7566,7 @@
 
     // 快捷键
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') closeDrawer();
+      if (e.key === 'Escape') { closeDrawer(); closeSettingsDrawer(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
         e.preventDefault();
         openSingleFile();
@@ -7521,7 +7602,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.18)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.19)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

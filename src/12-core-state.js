@@ -24,7 +24,12 @@
       // 图片背景：透明 PNG / SVG（截图、流程图、公式图）在暗色主题下没有底板会看不清，
       // 默认给所有正文图片铺一层白底；用户可在「主题 → 阅读设置」里改色或关闭
       imageBackground: true,
-      imageBackgroundColor: '#ffffff'
+      imageBackgroundColor: '#ffffff',
+      // 正文里的外部链接是否在新窗口打开。
+      // 默认 false = 保持历史行为（当前窗口打开）。
+      // 只作用于阅读器里的点击（见 bindContentJumpEvents 的链接处理）；
+      // 导出的 HTML 不含这个开关的影响。
+      openLinksInNewTab: false
     },
     imageMap: {},       // path -> objectURL，用于相对路径图片
     dirHandle: null,    // File System Access API 的当前目录句柄

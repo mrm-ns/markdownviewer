@@ -171,6 +171,24 @@
     document.getElementById('btn-close-theme').addEventListener('click', closeDrawer);
     document.getElementById('drawer-mask').addEventListener('click', closeDrawer);
 
+    // 设置抽屉（标题栏齿轮）：开合 + 里面的行为开关
+    const btnSettings = document.getElementById('btn-settings');
+    const btnCloseSettings = document.getElementById('btn-close-settings');
+    const settingsMask = document.getElementById('settings-drawer-mask');
+    if (btnSettings) btnSettings.addEventListener('click', openSettingsDrawerExclusive);
+    if (btnCloseSettings) btnCloseSettings.addEventListener('click', closeSettingsDrawer);
+    if (settingsMask) settingsMask.addEventListener('click', closeSettingsDrawer);
+
+    // 外部链接是否在新窗口打开：纯行为开关，不需要重渲染 ——
+    // 判定发生在点击时（见 bindContentJumpEvents），改完立刻生效。
+    const openLinksToggle = document.getElementById('open-links-new-tab-toggle');
+    if (openLinksToggle) {
+      openLinksToggle.addEventListener('change', function () {
+        state.settings.openLinksInNewTab = this.checked;
+        saveSettings();
+      });
+    }
+
     fileInput.addEventListener('change', function () {
       if (fileInput.files.length) appendFiles(fileInput.files);
     });
@@ -1494,7 +1512,30 @@
           const hashIndex = href.indexOf('#');
           const pathPart = hashIndex >= 0 ? href.slice(0, hashIndex) : href;
           const anchor = hashIndex >= 0 ? href.slice(hashIndex + 1) : '';
-          if (!pathPart || /^(https?:|mailto:|tel:|data:|blob:)/i.test(pathPart)) return;
+
+          // data: / blob: 是页面内资源，不干预，交给浏览器默认行为
+          if (/^(data:|blob:)/i.test(pathPart)) return;
+
+          // 外部链接（http / https / mailto / tel）：
+          // 「设置 → 链接在新窗口打开」开启时，用 window.open 在新窗口打开。
+          //
+          // 为什么在**点击时**判定，而不是渲染时给 <a> 写 target="_blank"：
+          //   1) 改设置立刻生效，不必为改一个开关重渲染整篇文档（重渲染有滚动/闪屏代价，见 §6.18）；
+          //   2) 只影响阅读器，导出的 HTML 不会被带上 target，产物行为保持原样；
+          //   3) 按住 Ctrl / ⌘ / Shift / Alt 时交回浏览器，保留原生「新标签页 / 新窗口」语义，
+          //      否则会把用户本来想要的新标签页强行变成 window.open 的新窗口。
+          if (/^(https?:|mailto:|tel:)/i.test(pathPart)) {
+            if (!state.settings.openLinksInNewTab) return;   // 关闭时保持历史行为（当前窗口打开）
+            if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            // noopener/noreferrer：不把本页 window 交给目标页（安全），且不发送 Referer
+            const opened = window.open(href, '_blank', 'noopener,noreferrer');
+            // 弹窗被拦截时的兜底：退化为当前窗口打开，避免「点了没反应」
+            if (!opened) window.location.href = href;
+            return;
+          }
+
+          if (!pathPart) return;
 
           const targetPath = resolveWorkspacePath(pathPart);
           const target = state.files.find(function (f) {
@@ -1609,7 +1650,7 @@
 
     // 快捷键
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') closeDrawer();
+      if (e.key === 'Escape') { closeDrawer(); closeSettingsDrawer(); }
       if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
         e.preventDefault();
         openSingleFile();
@@ -1645,7 +1686,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.18)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.19)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

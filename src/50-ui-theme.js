@@ -220,7 +220,11 @@
           // 只在显式存过 false 时才关闭（用 !== false 而不是 Boolean()，
           // 这样老版本设置里没有这个字段时，升级后按默认「开启」处理）
           imageBackground: parsed.imageBackground !== false,
-          imageBackgroundColor: normalizeCssColor(parsed.imageBackgroundColor) || '#ffffff'
+          imageBackgroundColor: normalizeCssColor(parsed.imageBackgroundColor) || '#ffffff',
+          // 外部链接是否新窗口打开：默认关闭，保持历史行为。
+          // 与 commentItalic 同理用 === true —— 老版本设置里没有这个字段，
+          // 若写成 !== false，老用户升级后会被判成「开启」，与默认值相反。
+          openLinksInNewTab: parsed.openLinksInNewTab === true
         };
       }
     } catch (e) {
@@ -279,6 +283,10 @@
     const imageBgColor = document.getElementById('image-background-color');
     if (imageBgToggle) imageBgToggle.checked = !!state.settings.imageBackground;
     if (imageBgColor) imageBgColor.value = state.settings.imageBackgroundColor || '#ffffff';
+    // 设置抽屉里的项也在这里回填：renderSettingsEditor() 是「设置 → 控件」的唯一出口，
+    // 新增设置项只要往这里加一行，两个抽屉打开时都会同步（见 AGENTS §6.15 第 6 条）
+    const openLinksToggle = document.getElementById('open-links-new-tab-toggle');
+    if (openLinksToggle) openLinksToggle.checked = !!state.settings.openLinksInNewTab;
   }
 
 
@@ -608,6 +616,7 @@
   }
 
   function openDrawer() {
+    closeSettingsDrawer();   // 两个右侧抽屉互斥，避免叠在一起
     document.getElementById('theme-drawer').classList.add('open');
     document.getElementById('theme-drawer').setAttribute('aria-hidden', 'false');
     setThemeMode(state.themeMode);
@@ -619,4 +628,30 @@
   function closeDrawer() {
     document.getElementById('theme-drawer').classList.remove('open');
     document.getElementById('theme-drawer').setAttribute('aria-hidden', 'true');
+  }
+
+  // ---------- 设置抽屉（标题栏齿轮按钮打开） ----------
+  // 与主题抽屉并列的第二个右侧抽屉，共用 .theme-drawer 那套 class 与控制方式。
+  // 用两个独立抽屉而不是往主题抽屉里塞：主题抽屉是「配色/版式」编辑器，
+  // 设置是「行为开关」，混在一起会让那个已经很高的抽屉更长。
+  function openSettingsDrawer() {
+    const drawer = document.getElementById('settings-drawer');
+    if (!drawer) return;
+    renderSettingsEditor();   // 打开前先回填，保证控件与 state 一致（不要只靠初始化时调一次）
+    drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeSettingsDrawer() {
+    const drawer = document.getElementById('settings-drawer');
+    if (!drawer) return;
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+  }
+
+  // 两个抽屉同时打开会叠在一起（都向右滑入、遮罩重叠，视觉上分不清在关哪个），
+  // 所以任一打开时先关掉另一个。
+  function openSettingsDrawerExclusive() {
+    closeDrawer();
+    openSettingsDrawer();
   }

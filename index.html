@@ -16,7 +16,7 @@
   
 
   <!-- 应用自身布局样式 -->
-  <link rel="stylesheet" href="css/style.css?v=1.1.18">
+  <link rel="stylesheet" href="css/style.css?v=1.1.19">
 
   
   
@@ -69,6 +69,9 @@
       </div>
       <div class="toolbar-right">
           <button id="btn-reload-file" class="btn" title="热重载当前文件">⟳</button>
+
+          <!-- 设置：齿轮图标，只显示图标不带文字（标题栏右侧，点开是右侧设置抽屉） -->
+          <button id="btn-settings" class="btn-icon" title="设置" aria-label="设置">⚙</button>
 
           <button id="toolbar-collapse-btn" class="btn" title="收起顶部菜单">▲</button>
 
@@ -261,6 +264,31 @@
     </div>
   </div>
 
+  <!-- 设置抽屉：复用主题抽屉的全部 class（.theme-drawer / .drawer-panel …），
+       所以样式、遮罩、右侧滑入动画都自动一致，不需要新增 CSS。 -->
+  <div id="settings-drawer" class="theme-drawer" aria-hidden="true">
+    <div class="drawer-mask" id="settings-drawer-mask"></div>
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <h2>⚙ 设置</h2>
+        <button id="btn-close-settings" class="btn-icon" aria-label="关闭">✕</button>
+      </div>
+
+      <div class="drawer-body">
+        <div class="form-row">
+          <label class="switch-label">
+            <input type="checkbox" id="open-links-new-tab-toggle">
+            <span>链接在新窗口打开</span>
+          </label>
+          <div class="pdf-preview-hint">
+            只影响正文里的外部链接（http / https / mailto / tel）。工作区内部的文档链接始终在应用内打开，不受此项影响。
+            按住 Ctrl / ⌘ / Shift 点击时仍按浏览器原生行为（默认就在新标签页打开）。
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 真实 PDF 预览弹层（iframe 内嵌 prince 生成的 PDF；此 iframe 不加 sandbox，
        Chrome 内置 PDF 查看器在 sandbox 帧里会被禁掉） -->
   <div id="pdf-preview-modal" class="pdf-modal" hidden>
@@ -299,6 +327,6 @@
   </div>
 
 
-  <script src="app.js?v=1.1.18"></script>
+  <script src="app.js?v=1.1.19"></script>
 </body>
 </html>
