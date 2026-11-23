@@ -1494,8 +1494,47 @@
     img.src = url;
   }
 
+  // 把「页面上图片的实际渲染尺寸」固化到导出的 <img> 上。
+  //
+  // 为什么需要：导出文档里的 img 只有 `max-width: 100%`，**没有固定宽度**，
+  // 于是它的最终尺寸由**导出文档自身的容器宽度**决定，而不是用户在页面上看到的尺寸。
+  // 导出容器比阅读器窄时图会变小（可接受），但容器更宽时图会撑回接近原始文件大小 ——
+  // 用户报告的「导出的图片使用原始文件大小」就是这个：页面上被 max-width 压小的图，
+  // 换到一份更宽的文档里又按原始像素铺开了。
+  // 现在按**当前渲染宽度**写成 px，导出结果与页面所见一致；`max-width: 100%` 仍然保留，
+  // 所以导出容器更窄时图依旧等比缩小，不会溢出。
+  //
+  // 只写 width、不写 height：高度交给 CSS 的 `height: auto` 按原比例算。
+  // 若把 height 也写死，导出容器变窄时宽度被 max-width 压住而高度不变，图会被压扁。
+  //
+  // 必须在 clone **之后**、把 HTML 序列化**之前**调用，且用**活的** container 量尺寸
+  // （clone 不在文档流里，getBoundingClientRect 量到的是 0）。
+  function freezeRenderedImageWidths(sourceContainer, clone) {
+    const srcImgs = sourceContainer.querySelectorAll('img');
+    const cloneImgs = clone.querySelectorAll('img');
+    // cloneNode 保留文档顺序，所以按下标一一对应即可
+    const count = Math.min(srcImgs.length, cloneImgs.length);
+    for (let i = 0; i < count; i++) {
+      const src = srcImgs[i];
+      const dst = cloneImgs[i];
+      // 只处理**已成功加载**的图：未加载 / 已损坏时量到的宽度是 0，
+      // 写成 0px 会把图片直接压没，所以宁可跳过、保持原样。
+      if (!src.complete || src.naturalWidth === 0) continue;
+      const rect = src.getBoundingClientRect();
+      const w = Math.round(rect.width);
+      if (w <= 0) continue;
+      // 清掉 width/height 属性：它们会与内联 style 打架，
+      // 且页面若靠属性定尺寸，用渲染宽度覆盖后结果等价、更准确
+      dst.removeAttribute('width');
+      dst.removeAttribute('height');
+      dst.style.width = w + 'px';
+    }
+  }
+
   function inlineImagesForExport(container, callback) {
     const clone = container.cloneNode(true);
+    // 先把渲染尺寸固化下来（两套导出——HTML 与 PDF——都走这里，所以一处改动两边生效）
+    freezeRenderedImageWidths(container, clone);
     const imgs = clone.querySelectorAll('img');
     const pending = [];
     imgs.forEach(function (img) {
@@ -7602,7 +7641,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.19)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.20)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
