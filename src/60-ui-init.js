@@ -1528,7 +1528,17 @@
             return;
           }
 
-          if (!pathPart) return;
+          if (!pathPart) {
+            // 纯页内锚点（#xxx）：精确命中时保持浏览器原生行为不变；只在「精确 id 查不到、
+            // 但能按标题文本宽容匹配到」时才接管滚动 —— 手写 fragment 与渲染器生成 id
+            // 常差在标点上（见 findAnchorElement）。两者都不中则仍交回浏览器。
+            if (!anchor) return;
+            if (document.getElementById(anchor)) return;
+            if (!findAnchorElement(anchor)) return;
+            e.preventDefault();
+            scrollToAnchor(anchor);
+            return;
+          }
 
           const targetPath = resolveWorkspacePath(pathPart);
           const target = state.files.find(function (f) {
@@ -1679,7 +1689,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.21)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.22)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

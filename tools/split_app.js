@@ -322,6 +322,10 @@ function cmdCheckAll() {
     //     让 logo 的定位基准落在「内容区/留白区」分界线上（见 AGENTS.md §6.16）
     //   - .pdf-logo 的 top/right 由 0 改为 top:2mm right:0
     /^\s{6}'body \{ margin: 0; padding: 0; background: ' \+ C\.pdfPageBg \+ '; color: ' \+ C\.pdfText \+ '; \}',$/,
+    // v1.1.22 锚点宽容匹配：`if (!pathPart) return;`（纯页内锚点一律交回浏览器）
+    // 改为「精确 id 命中才交回浏览器，否则先试 findAnchorElement 的宽容匹配」，
+    // 原行被有意替换（见 AGENTS.md §6.21）
+    /^\s{10}if \(!pathPart\) return;$/,
   ];
   // 整函数重写的白名单：当一次修改是「整段重写」某个函数而不是改几行时，
   // 逐行白名单会膨胀到几十条、失去审计意义。这里按「函数体范围」放行：
