@@ -838,41 +838,34 @@
         var contentLineAtPoint = null;
         var contentBlankCtx = null;
 
-        // 菜单项 → 插入上下文：优先按「右键落点所在的那一行」定位；
-        // 取不到行（浏览器无 caretRangeFromPoint、落点在怪位置等）时退回按块边界定位。
-        // kind 目前对插入行数没有影响（文本块/代码块的行由编辑框内容决定），保留形参以兼容调用处。
+        // 菜单项 → 插入上下文。
+        // 定位策略（v1.1.21，见 31-core-block.js 的 resolveInsertAnchor）：
+        //   · 普通段落 / 列表项 → **行级**：按落点所在那一行 / 那一项插入；
+        //   · 代码块 / 引用块 → **整块**：只在块外上下插入，绝不插进内部
+        //     （插进去会变成代码或引用的一部分，插入围栏代码块还会把原代码块截断）。
+        // 取不到落点行时退回按块边界（旧行为），不会插错位置。
         function computeMenuInsertCtx(kind, side) {
           if (contentLineAtPoint && contentInsertBlock) {
-            const range = getBlockRange(contentInsertBlock);
-            if (range) {
-              // 落点在围栏代码块里（含围栏行本身）时，吸附到该代码块的上下边界：
-              // 插进代码块内部会把内容变成代码，插入围栏代码块更会把原代码块截断。
-              // 这里不传 rect，让预览线改按块边界画，否则线会画在鼠标那一行、与实际插入点不符。
-              const fence = fenceBlockAtLine(
-                state.currentText ? state.currentText.replace(/\r\n/g, '\n').split('\n') : [],
-                contentLineAtPoint.line);
-              if (fence) {
-                return {
-                  line: side === 'above' ? fence.start : fence.end + 1,
-                  anchorEl: contentInsertBlock,
-                  side: side === 'above' ? 'above' : 'below',
-                  insideBlock: false,
-                  rect: null
-                };
-              }
-              // above = 该行之上（即该行本身的位置）；below = 该行之下
-              let at = side === 'above' ? contentLineAtPoint.line : contentLineAtPoint.line + 1;
-              // 夹到该块自身范围，避免偏移算偏时插进相邻块
-              at = Math.max(range.start, Math.min(at, range.end + 1));
-              // 插入点在块「内部」（不是块首行之上、也不是块末行之下）时不补空行，
-              // 否则会把该段拆成三段
-              const insideBlock = at > range.start && at <= range.end;
+            const lines = state.currentText
+              ? state.currentText.replace(/\r\n/g, '\n').split('\n')
+              : [];
+            const anchor = resolveInsertAnchor({
+              lines: lines,
+              hostTag: contentLineAtPoint.hostTag,
+              hostRange: contentLineAtPoint.hostRange,
+              topRange: getBlockRange(contentInsertBlock),
+              clickLine: contentLineAtPoint.line,
+              side: side
+            });
+            if (anchor) {
               return {
-                line: at,
+                line: anchor.line,
                 anchorEl: contentInsertBlock,
                 side: side === 'above' ? 'above' : 'below',
-                insideBlock: insideBlock,
-                rect: contentLineAtPoint.rect
+                insideBlock: anchor.insideBlock,
+                // useLineRect 为 false 时传 null，让预览线改按块边界画，
+                // 否则线会画在鼠标那一行、与实际插入点（块外）不符
+                rect: anchor.useLineRect ? contentLineAtPoint.rect : null
               };
             }
           }
@@ -1686,7 +1679,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.20)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.21)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

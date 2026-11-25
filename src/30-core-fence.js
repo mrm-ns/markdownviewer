@@ -642,6 +642,16 @@
     window.scrollTo(0, saved.win);
   }
 
+  // 列表项里「属于嵌套内容」的块级标签：这些是渲染器放在 <li> 内部的子项
+  // （子列表 / 围栏代码块 / 引用块 / 表格 / 嵌套段落…），编辑列表项时必须原样保留，
+  // 否则会像旧实现那样「一编辑列表项，它下面的子项全消失」。
+  // 其余元素（strong / em / del / code / img / input / a / font / br）都是本项自己的**行内**内容，
+  // 已经整体出现在编辑框里，应当移除。
+  const NESTED_BLOCK_TAGS = {
+    P: 1, UL: 1, OL: 1, PRE: 1, BLOCKQUOTE: 1, TABLE: 1, HR: 1,
+    H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1
+  };
+
   function startEditTextElement(el) {
     const fallbackLine = parseInt(el.getAttribute('data-source-line'), 10);
     const sourceLine = resolveSourceLine(el, isNaN(fallbackLine) ? -1 : fallbackLine);
@@ -684,8 +694,24 @@
     textarea.value = oldRaw;
     textarea.style.width = '100%';
     
-    el.innerHTML = '';
-    el.appendChild(textarea);
+    // 列表项：只清掉「本项自己的行内内容」，**保留嵌套子元素**（子列表 / 代码块 / 引用块…）。
+    //
+    // 旧写法一律 el.innerHTML = '' 会把整棵子树一起抹掉 —— 因为渲染器把嵌套内容放在 <li> 内部
+    // （22-core-inline-html.js 的 builtinParseList 写的是 '<li …>' + inner + nestedHtml + '</li>'），
+    // 于是「编辑一个列表项」时它下面的子项全部从屏幕上消失。
+    // 源码层面其实没丢（列表项只编辑自己那一行，endLine = sourceLine，子树的行原样保留），
+    // 所以这里只需保住 DOM：编辑期间子项仍然可见，保存后整篇重渲染也照旧。
+    if (el.tagName === 'LI') {
+      Array.prototype.slice.call(el.childNodes).forEach(function (node) {
+        // 元素节点且属于嵌套块级内容 → 保留；文本节点与行内标签 → 移除
+        if (node.nodeType === 1 && NESTED_BLOCK_TAGS[node.tagName]) return;
+        el.removeChild(node);
+      });
+      el.insertBefore(textarea, el.firstChild);
+    } else {
+      el.innerHTML = '';
+      el.appendChild(textarea);
+    }
 
     // 高度跟随内容：单行内容就是一行高，输入换行即增高、删回即缩回。
     // 不加 preHeight 下限——那会让单行段落的编辑框仍撑到原块高度。

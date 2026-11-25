@@ -545,6 +545,77 @@
     return { line: at, anchorEl: body ? body.lastElementChild : null, side: 'below', insideBlock: false };
   }
 
+  // === INSERT_ANCHOR_BEGIN ===
+  // 插入锚点：把「右键落点」换算成真正要插入的源码行号 + 该不该按行画预览线。
+  //
+  // 用户需求（v1.1.21）：
+  //   - **行级**：普通段落、列表项按「落点所在的那一行 / 那一项」插入，而不是整块上下；
+  //   - **代码块与引用块（注释块）仍按整块**：插到内部会把内容变成代码 / 引用的一部分，
+  //     插入围栏代码块更会把原代码块从中间截断，所以只在块外上下插入。
+  //
+  // 为什么列表项的「下方」取「子树末行 + 1」而不是 itemLine + 1：
+  //   渲染器把嵌套内容放在 <li> 内部（22-core-inline-html.js 的 builtinParseList 写的是
+  //   '<li …>' + inner + nestedHtml + '</li>'），且 li 的 data-source-end 覆盖整棵子树。
+  //   若插到 itemLine + 1，新内容会夹在列表项与它的子项之间 —— 子项缩进还在，
+  //   但中间多了一段非列表内容，结构就散了。取子树末行 + 1 = 插到该项整体之后、下一项之前。
+  //   无子项时 range.end === range.start，于是行为与「行级」完全一致。
+  //
+  // 返回值：
+  //   line        要插入的源码行号（插在该行之前）
+  //   insideBlock 插入点是否落在块内部（决定要不要补空行，见 computeInsertPadding）
+  //   useLineRect 预览线是否用「落点那一行」的矩形；false 时改用 anchorEl 的块边界
+  //
+  // 纯函数：只依赖入参，不碰 DOM，可在 Node 里直接断言。
+  function resolveInsertAnchor(opts) {
+    const o = opts || {};
+    const lines = o.lines || [];
+    const hostTag = o.hostTag || '';
+    const hostRange = o.hostRange;
+    const topRange = o.topRange;
+    const clickLine = o.clickLine;
+    const above = o.side === 'above';
+    if (!lines.length || clickLine == null || !isFinite(clickLine)) return null;
+
+    // 1) 围栏代码块优先：只要该行落在代码块内（含围栏行），一律吸附到代码块上下边界。
+    //    放在最前面且独立于 DOM 判定，是因为它靠「从文件头顺序配对围栏」判断，
+    //    对未闭合围栏也成立；DOM 那条路在代码块特别大时可能取不到精确行。
+    const fence = fenceBlockAtLine(lines, clickLine);
+    if (fence) {
+      return { line: above ? fence.start : fence.end + 1, insideBlock: false, useLineRect: false };
+    }
+
+    const range = hostRange || topRange;
+    if (!range) return null;
+
+    // 2) 整块对待的宿主：引用块 / 标题 / 表格 / 分隔线。
+    //    列表项单独列出（它也用 range 边界，但预览线仍用落点那一项的矩形）。
+    const WHOLE_BLOCK_TAGS = {
+      BLOCKQUOTE: 1, TABLE: 1, HR: 1,
+      H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1
+    };
+    if (hostTag === 'LI') {
+      // 列表项：上下都按该项（含子树）的边界，预览线用 li 自己的矩形
+      //（li 的 bounding box 天然包含子项，所以「下方」正好画在子树底部）
+      return { line: above ? range.start : range.end + 1, insideBlock: false, useLineRect: true };
+    }
+    if (WHOLE_BLOCK_TAGS[hostTag] || hostTag === 'PRE') {
+      return { line: above ? range.start : range.end + 1, insideBlock: false, useLineRect: false };
+    }
+
+    // 3) 普通段落（以及其他未列出的行级宿主）：严格按落点那一行插入
+    let at = above ? clickLine : clickLine + 1;
+    // 夹到该块自身范围，避免偏移算偏时插进相邻块
+    at = Math.max(range.start, Math.min(at, range.end + 1));
+    return {
+      line: at,
+      // 插入点在块「内部」（不是块首行之上、也不是块末行之下）时不补空行，
+      // 否则会把该段拆成三段（见 computeInsertPadding）
+      insideBlock: at > range.start && at <= range.end,
+      useLineRect: true
+    };
+  }
+  // === INSERT_ANCHOR_END ===
+
   // === CLAMP_LINE_OFFSET_BEGIN ===
   // 把「块内行偏移」夹到该块自身的行范围内。
   // 为什么必须夹：段落里的 <br> 既可能是源码换行，也可能来自允许的内联标签 <br>；
@@ -700,7 +771,32 @@
       }
     }
 
-    return { line: start + lineOffset, rect: rect };
+    // 一并返回宿主信息，供插入锚点判断「这一行属于哪种结构」（见 resolveInsertAnchor）。
+    // wholeBlockEl：若该行落在代码块 / 引用块内部，返回那个整体块 —— 插入必须按整块处理。
+    const wholeBlockEl = nearestWholeBlockAncestor(host, body);
+    return {
+      line: start + lineOffset,
+      rect: rect,
+      hostTag: wholeBlockEl ? wholeBlockEl.tagName : host.tagName,
+      hostRange: getBlockRange(wholeBlockEl || host)
+    };
+  }
+
+  // 从 host 向上找「必须整体对待」的祖先块：围栏代码块 / 引用块。
+  // 为什么要向上找而不是只看 host 自己：引用块里的段落由内置渲染器递归生成，
+  // 内层 <p> 自己带 data-source-line（绝对行号），于是 findLineHost 会命中那个 <p>。
+  // 若不向上检查，右键引用块里的文字就会被当成普通段落做「行级」插入 ——
+  // 插进去的内容会变成引用的一部分，把引用块从中间截断。
+  // 代码块同理（<pre> 内的 <code> 没有 data-source-line，但保险起见一并检查）。
+  function nearestWholeBlockAncestor(host, body) {
+    let cur = host;
+    while (cur && cur !== body) {
+      if (cur.nodeType === 1 && (cur.tagName === 'PRE' || cur.tagName === 'BLOCKQUOTE')) {
+        return cur;
+      }
+      cur = cur.parentNode;
+    }
+    return null;
   }
   // === LINE_AT_POINT_END ===
 
