@@ -614,6 +614,7 @@
         state.contentSearchResults = null;
         state.contentSearchTruncated = false;
         state.searchExpandedFiles.clear(); // 换了搜索范围，重新搜索时恢复默认折叠
+        state.searchCollapsedDirs.clear(); // 目录默认展开，换搜索时一并复位
         state.search = searchBox ? searchBox.value.trim() : '';
         updateSearchPlaceholder();
         if (state.searchMode === 'content' && state.search) {
@@ -624,10 +625,28 @@
       });
     }
 
-    // 搜索结果点击：标题行折叠 / 展开，具体结果行跳转到对应文件的对应源码行
+    // 搜索结果点击：目录头折叠 / 文件头折叠 / 具体结果行跳到对应源码行
     const searchResultsEl = document.getElementById('search-results');
     if (searchResultsEl) {
       searchResultsEl.addEventListener('click', function (e) {
+        // 目录头：整组（含子树）收起 / 展开。
+        // 只改 style.display 与箭头、并把状态记进 state（渲染是整块重建 innerHTML 的）
+        const dirHeader = e.target.closest('.search-dir-header');
+        if (dirHeader) {
+          const dir = dirHeader.closest('.search-dir');
+          const dirItems = dir ? dir.querySelector('.search-dir-items') : null;
+          const dirPath = dir ? dir.getAttribute('data-dir') : null;
+          if (!dir || !dirItems || dirPath == null) return;
+          const nowOpen = dirItems.style.display === 'none';
+          dirItems.style.display = nowOpen ? '' : 'none';
+          dir.classList.toggle('collapsed', !nowOpen);
+          const dirArrow = dir.querySelector('.search-dir-arrow');
+          if (dirArrow) dirArrow.textContent = nowOpen ? '▾' : '▸';
+          // 默认是展开的，所以状态存「收起的目录」
+          if (nowOpen) state.searchCollapsedDirs.delete(dirPath);
+          else state.searchCollapsedDirs.add(dirPath);
+          return; // 目录头不触发跳转
+        }
         const header = e.target.closest('.search-group-header');
         if (header) {
           const group = header.closest('.search-group');
@@ -1689,7 +1708,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.22)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.23)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();

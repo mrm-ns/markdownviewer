@@ -13,6 +13,11 @@
     searchReqSeq: 0,            // 全文搜索竞态序号
     searchTextCache: {},        // path -> { lastModified, size, text }，全文搜索文本缓存
     searchExpandedFiles: new Set(), // 全文搜索里已展开的文件路径（结果按文件分组折叠，默认全部收起）
+    // 全文搜索里**已收起**的目录路径（Set，元素形如 'notes/ops/'；根目录用 ''）。
+    // 为什么存「收起」而不是「展开」：目录默认是**展开**的 —— 用户要的是「结果按目录归类」，
+    // 归类的目录头一出现就把结果藏起来会让人以为搜索没结果。
+    // 存反面的好处是新搜索（Set 为空）自然落到「全部展开」，不需要额外初始化。
+    searchCollapsedDirs: new Set(),
     settings: {
       textSize: 16,
       codeSize: 13.5,

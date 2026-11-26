@@ -264,6 +264,62 @@ body.toolbar-collapsed .toolbar {
   display: none;
 }
 
+/* ===== 按目录归类的最外层分组（目录 → 文件 → 命中行） ===== */
+.search-dir {
+  margin-bottom: 8px;
+}
+
+.search-dir-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.search-dir-header:hover {
+  background: var(--sidebar-hover);
+}
+
+/* 目录右侧的小三角：▸ 收起 / ▾ 展开 */
+.search-dir-arrow {
+  flex-shrink: 0;
+  width: 10px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--muted);
+}
+
+.search-dir-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-dir-count {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--sidebar-hover);
+  border-radius: 10px;
+  padding: 1px 7px;
+}
+
+/* 目录内容：左侧缩进 + 竖线，体现层级 */
+.search-dir-items {
+  margin-left: 9px;
+  padding-left: 7px;
+  border-left: 1px solid var(--sidebar-border);
+}
+
 /* ===== 按文件分组的组标题（可折叠） ===== */
 .search-group {
   margin-bottom: 6px;
@@ -300,18 +356,6 @@ body.toolbar-collapsed .toolbar {
   flex-shrink: 0;
   font-size: 10px;
   line-height: 1;
-  color: var(--muted);
-}
-
-/* 目录前缀：弱化显示，用于区分不同目录下的同名文件 */
-.search-group-folder {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 400;
   color: var(--muted);
 }
 

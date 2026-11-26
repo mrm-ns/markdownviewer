@@ -5,9 +5,9 @@ markdown-viewer-portable.zip
 __pycache__/
 *.py[cod]
 
-# Developer documentation (README.md stays tracked)
-AGENTS.md
-CHANGELOG.md
+# Developer documentation
+# AGENTS.md and CHANGELOG.md stay tracked: readers of the repo need the
+# development rules and the version history (user request, 2026-11-26).
 TASKLIST.md
 ENVIRONMENT.md
 

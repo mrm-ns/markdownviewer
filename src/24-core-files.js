@@ -332,9 +332,68 @@
     return html;
   }
 
-  // 渲染全文搜索行级结果：按文件分组，文件名作组标题，默认折叠
+  // === SEARCH_DIR_TREE_BEGIN ===
+  // 把「按文件分组后的搜索结果」再按**目录**归类成一棵树（v1.1.23）。
+  //
+  // 为什么要这一步：以前是平铺的文件组，目录只作为文件名右侧的小字标注，
+  // 几十个文件时完全看不出结构。现在按 path 的目录前缀建树，逐级嵌套，
+  // 与左侧文件树的观感一致。
+  //
+  // 节点结构：{ name, path, dirs: [], files: [] }
+  //   path 是「目录前缀」，统一带结尾斜杠（根目录为 ''），用作展开状态的 key。
+  //   dirs 按名称排序（目录稳定可预期）；files 保持结果原有顺序（用户更关心命中先后）。
+  //
+  // 纯函数（不碰 DOM），可在 Node 里直接断言。
+  function buildSearchDirTree(groups) {
+    const root = { name: '', path: '', dirs: [], files: [] };
+    const dirIndex = { '': root };
+
+    // 按需创建某一级目录节点，返回它的节点
+    function ensureDir(segments) {
+      let node = root;
+      let prefix = '';
+      for (let i = 0; i < segments.length; i++) {
+        prefix += segments[i] + '/';
+        let child = dirIndex[prefix];
+        if (!child) {
+          child = { name: segments[i], path: prefix, dirs: [], files: [] };
+          dirIndex[prefix] = child;
+          node.dirs.push(child);
+        }
+        node = child;
+      }
+      return node;
+    }
+
+    groups.forEach(function (g) {
+      // 目录前缀：去掉路径最后一段（文件名）。'a/b/c.md' → ['a','b']
+      const slash = g.path.lastIndexOf('/');
+      const dirPart = slash >= 0 ? g.path.slice(0, slash) : '';
+      const segments = dirPart ? dirPart.split('/') : [];
+      ensureDir(segments).files.push(g);
+    });
+
+    // 目录按名称排序（同级），保证每次渲染顺序稳定
+    (function sortDirs(node) {
+      node.dirs.sort(function (a, b) { return a.name.localeCompare(b.name, 'zh-CN'); });
+      node.dirs.forEach(sortDirs);
+    })(root);
+
+    return root;
+  }
+
+  // 统计某个目录节点下的命中总数（递归），显示在目录头上
+  function countSearchDirHits(node) {
+    let n = 0;
+    node.files.forEach(function (f) { n += f.items.length; });
+    node.dirs.forEach(function (d) { n += countSearchDirHits(d); });
+    return n;
+  }
+  // === SEARCH_DIR_TREE_END ===
+
+  // 渲染全文搜索行级结果：**按目录归类**（目录 → 文件 → 命中行），文件与命中的折叠状态见 state
   // 注意：搜索结果每次（继续输入、跳转、打开文件等）都会整块重建 innerHTML，
-  // 所以展开状态存放在 state.searchExpandedFiles 里，渲染时按它决定是否展开。
+  // 所以展开状态存放在 state.searchCollapsedDirs / state.searchExpandedFiles 里，渲染时按它决定。
   function renderSearchResults(results) {
     const el = document.getElementById('search-results');
     if (!el) return;
@@ -344,7 +403,7 @@
     }
     const keyword = (state.search || '').toLowerCase();
 
-    // 按文件分组：key 用完整 path，避免不同目录下的同名文件被并成一组；保持结果原有顺序
+    // 第一步：按文件分组（key 用完整 path，避免不同目录下的同名文件被并成一组）
     const groups = [];
     const groupIndex = {};
     results.forEach(function (r) {
@@ -357,11 +416,12 @@
       g.items.push(r);
     });
 
-    let html = '';
-    groups.forEach(function (g) {
+    // 第二步：按目录建树，然后递归渲染
+    const tree = buildSearchDirTree(groups);
+
+    // 渲染「一个文件」：组标题 + 命中行（与原实现一致，只是不再带目录小字）
+    function renderFileGroup(g) {
       const open = state.searchExpandedFiles.has(g.path);
-      // 文件路径去掉文件名后的目录前缀，用于在同名文件之间区分
-      const folder = g.path.replace(/[^/]*$/, '');
       let itemsHtml = '';
       g.items.forEach(function (r) {
         const crumb = r.breadcrumbs && r.breadcrumbs.length
@@ -382,17 +442,42 @@
           '<div class="search-result-snippet">' + buildSearchSnippet(r.text, keyword) + '</div>' +
         '</div>';
       });
-      html += '<div class="search-group' + (open ? ' open' : '') + '" data-path="' + escapeHtml(g.path) + '">' +
+      return '<div class="search-group' + (open ? ' open' : '') + '" data-path="' + escapeHtml(g.path) + '">' +
         '<div class="search-group-header" title="点击展开 / 收起此文件的匹配行">' +
           '<span class="search-group-name">📄 ' + escapeHtml(g.name || g.path) + '</span>' +
           '<span class="search-group-arrow">' + (open ? '▾' : '▸') + '</span>' +
-          (folder ? '<span class="search-group-folder">' + escapeHtml(folder) + '</span>' : '') +
           '<span class="search-group-count">' + g.items.length + '</span>' +
         '</div>' +
         '<div class="search-group-items"' + (open ? '' : ' style="display:none"') + '>' + itemsHtml + '</div>' +
       '</div>';
-    });
-    el.innerHTML = html;
+    }
+
+    // 渲染一个目录节点：目录头 + （子树目录 / 直接子文件）
+    // 目录默认**展开**，只有 state.searchCollapsedDirs 里登记过的才是收起的。
+    function renderDir(node, isRoot) {
+      // 根目录本身不画头，直接铺开它的子目录与文件（工作区根下常常有文件）
+      if (isRoot) {
+        let inner = '';
+        node.dirs.forEach(function (d) { inner += renderDir(d, false); });
+        node.files.forEach(function (g) { inner += renderFileGroup(g); });
+        return inner;
+      }
+      const collapsed = state.searchCollapsedDirs.has(node.path);
+      const hits = countSearchDirHits(node);
+      let inner = '';
+      node.dirs.forEach(function (d) { inner += renderDir(d, false); });
+      node.files.forEach(function (g) { inner += renderFileGroup(g); });
+      return '<div class="search-dir' + (collapsed ? ' collapsed' : '') + '" data-dir="' + escapeHtml(node.path) + '">' +
+        '<div class="search-dir-header" title="点击展开 / 收起此目录下的搜索结果">' +
+          '<span class="search-dir-arrow">' + (collapsed ? '▸' : '▾') + '</span>' +
+          '<span class="search-dir-name">📁 ' + escapeHtml(node.name) + '</span>' +
+          '<span class="search-dir-count">' + hits + '</span>' +
+        '</div>' +
+        '<div class="search-dir-items"' + (collapsed ? ' style="display:none"' : '') + '>' + inner + '</div>' +
+      '</div>';
+    }
+
+    el.innerHTML = renderDir(tree, true);
   }
 
   const CONTENT_SEARCH_MAX_RESULTS = 1000; // 全文搜索结果上限
