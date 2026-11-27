@@ -326,6 +326,17 @@ function cmdCheckAll() {
     // 改为「精确 id 命中才交回浏览器，否则先试 findAnchorElement 的宽容匹配」，
     // 原行被有意替换（见 AGENTS.md §6.21）
     /^\s{10}if \(!pathPart\) return;$/,
+    // v1.1.24 链接开关拆成两个（外部链接 / 工作区文档链接）：
+    //   - state.settings 与 loadSettings 追加 openInternalLinksInNewTab，原 last 字段行补逗号
+    //   - 唯一的开关 id 改为 open-external-links-new-tab-toggle（两个开关各一个 id）
+    //   - 绑定处的注释与点击处理里的注释同步改成「外部链接」
+    // 这些都是「为加第二个开关而有意改写」的原行，行为本身未变。
+    /^\s{6}\/\/ 正文里的外部链接是否在新窗口打开。$/,
+    /^\s{6}openLinksInNewTab: false$/,
+    /^\s{10}openLinksInNewTab: parsed\.openLinksInNewTab === true$/,
+    /^\s{4}const openLinksToggle = document\.getElementById\('open-links-new-tab-toggle'\);$/,
+    /^\s{4}\/\/ 外部链接是否在新窗口打开：纯行为开关，不需要重渲染 ——$/,
+    /^\s{10}\/\/ 「设置 → 链接在新窗口打开」开启时，用 window\.open 在新窗口打开。$/,
   ];
   // 整函数重写的白名单：当一次修改是「整段重写」某个函数而不是改几行时，
   // 逐行白名单会膨胀到几十条、失去审计意义。这里按「函数体范围」放行：

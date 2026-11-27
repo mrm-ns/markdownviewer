@@ -30,11 +30,20 @@
       // 默认给所有正文图片铺一层白底；用户可在「主题 → 阅读设置」里改色或关闭
       imageBackground: true,
       imageBackgroundColor: '#ffffff',
-      // 正文里的外部链接是否在新窗口打开。
+      // 正文里的**外部链接**（http / https / mailto / tel）是否在新窗口打开。
+      // 字段名沿用历史名（localStorage 里就存这个键，改名会让老用户的选择丢失）。
       // 默认 false = 保持历史行为（当前窗口打开）。
       // 只作用于阅读器里的点击（见 bindContentJumpEvents 的链接处理）；
       // 导出的 HTML 不含这个开关的影响。
-      openLinksInNewTab: false
+      openLinksInNewTab: false,
+      // 工作区**内部文档链接**（含 #标题 锚点）是否在新窗口打开。
+      // 与上面的外部链接开关相互独立：两个都开 = 所有链接都新窗口。
+      // 实现上不是 window.open(href) —— 应用没有文件级 URL，只能打开
+      // "index.html?open=<工作区相对路径>#<锚点>"，让新标签页启动时自己恢复工作区
+      // 再打开目标文档（见 openInternalLinkNewTab / openRequestedFileFromUrl）。
+      // 因此只在「默认目录会话」下可用：临时打开的文件夹在新标签页里不存在。
+      // 默认 false = 保持历史行为（应用内跳转）。
+      openInternalLinksInNewTab: false
     },
     imageMap: {},       // path -> objectURL，用于相对路径图片
     dirHandle: null,    // File System Access API 的当前目录句柄
@@ -42,6 +51,9 @@
     snapshotData: null, // 默认目录浏览器缓存快照（File System Access API 不可用时 fallback）
     pendingSnapshot: null, // 正在异步构建的内存快照 Promise（打开兼容目录时记录）
     isDefaultSession: false, // 当前会话是否属于默认目录（为 true 时编辑写回才会持久化到默认缓存槽）
+    // 「工作区文档链接在新窗口打开」开启、但当前不是默认目录时的提示只弹一次：
+    // 每次点链接都弹会打断阅读，而原因在「设定默认目录」之前不会变。
+    internalNewTabHintShown: false,
     pendingCompatibleNote: false, // 系统目录受限回退后，是否提示兼容模式说明
     userThemes: [],     // 用户导入的主题，会出现在预设下拉框中
     sidebarTab: 'files',

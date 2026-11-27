@@ -179,13 +179,24 @@
     if (btnCloseSettings) btnCloseSettings.addEventListener('click', closeSettingsDrawer);
     if (settingsMask) settingsMask.addEventListener('click', closeSettingsDrawer);
 
-    // 外部链接是否在新窗口打开：纯行为开关，不需要重渲染 ——
+    // 链接打开方式（两个独立开关）：纯行为开关，不需要重渲染 ——
     // 判定发生在点击时（见 bindContentJumpEvents），改完立刻生效。
-    const openLinksToggle = document.getElementById('open-links-new-tab-toggle');
+    const openLinksToggle = document.getElementById('open-external-links-new-tab-toggle');
     if (openLinksToggle) {
       openLinksToggle.addEventListener('change', function () {
         state.settings.openLinksInNewTab = this.checked;
         saveSettings();
+      });
+    }
+    const openInternalLinksToggle = document.getElementById('open-internal-links-new-tab-toggle');
+    if (openInternalLinksToggle) {
+      openInternalLinksToggle.addEventListener('change', function () {
+        state.settings.openInternalLinksInNewTab = this.checked;
+        saveSettings();
+        // 提示「只在默认目录下生效」这一前提，改完开关立刻说清楚，别等用户点了链接才发现
+        if (this.checked && !state.isDefaultSession) {
+          toast('当前文件夹不是「默认目录」，文档链接仍会在应用内打开');
+        }
       });
     }
 
@@ -1512,6 +1523,73 @@
 
   }
 
+  // ---------- 工作区文档链接在新窗口打开（?open= 入口） ----------
+  //
+  // 应用是纯前端的单页阅读器，**没有「文件级 URL」** —— 浏览器地址栏里只有 index.html，
+  // 所以内部文档链接不能像外部链接那样 window.open(href)（那样开出来的是一张空白欢迎页）。
+  // 做法：新标签页打开本应用自己的地址，并用 ?open=<工作区相对路径>#<锚点> 告诉它
+  // 启动后要打开哪份文档、跳到哪个标题；新标签页启动时会先恢复默认目录，
+  // 再按这个参数打开文件（openRequestedFileFromUrl）。
+  //
+  // 于是它有一个硬前提：**工作区必须是「默认目录」**（句柄或缓存快照能让新标签页自己恢复）。
+  // 临时用「打开文件夹」选的目录在新标签页里并不存在，硬开会得到一个空白的欢迎页，
+  // 所以此时直接回落到应用内跳转，并提示一次原因。
+
+  // 在新标签页打开某个工作区文档（anchor 为空则只打开不跳转）。
+  // 返回 true 表示已经在新标签页打开；false 表示调用方应回落到应用内跳转。
+  function openInternalLinkNewTab(path, anchor) {
+    if (!path) return false;
+    if (!state.isDefaultSession) {
+      if (!state.internalNewTabHintShown) {
+        state.internalNewTabHintShown = true;
+        toast('当前文件夹不是「默认目录」，新窗口无法恢复工作区，链接仍在应用内打开');
+      }
+      return false;
+    }
+    // 基址 = 当前页面地址去掉已有的 ?query 与 #hash（本页自己可能就是 ?open= 打开的，
+    // 必须换掉旧的 open 参数，否则会一直打开第一篇）
+    const base = location.href.split('#')[0].split('?')[0];
+    let url = base + '?open=' + encodeURIComponent(path);
+    if (anchor) url += '#' + encodeURIComponent(anchor);
+    const opened = window.open(url, '_blank');
+    // 弹窗被拦截：回落到应用内跳转，避免「点了没反应」
+    if (!opened) return false;
+    // 不把本页 window 交给新标签页（安全），也用不着它回写
+    try { opened.opener = null; } catch (err) { /* 跨域时忽略 */ }
+    return true;
+  }
+
+  // 从 ?open=<相对路径>#<锚点> 读出启动时要打开的目标。
+  // 路径与锚点都可能被百分号编码（中文标题必然编码），两处都要解码；
+  // 解码失败就按原样用，交给后续「找不到就明确提示」的兜底。
+  function readStartupOpenRequest() {
+    const m = /[?&]open=([^&]*)/.exec(location.search || '');
+    if (!m) return null;
+    let path = m[1];
+    try { path = decodeURIComponent(path); } catch (err) { /* 保留原样 */ }
+    if (!path) return null;
+    let anchor = location.hash && location.hash.length > 1 ? location.hash.slice(1) : '';
+    if (anchor) {
+      try { anchor = decodeURIComponent(anchor); } catch (err) { /* 保留原样 */ }
+    }
+    return { path: path, anchor: anchor };
+  }
+
+  // 新标签页里：打开 ?open= 指定的文档并定位锚点。
+  // 必须在 restoreDefaultDirectory() 之后调用 —— 那时 state.files 才有内容。
+  // 找不到要**明确报出来**，不能静默停在欢迎页（用户只会看到「点了链接什么都没发生」）。
+  async function openRequestedFileFromUrl() {
+    const req = readStartupOpenRequest();
+    if (!req) return;
+    const item = state.files.find(function (f) { return f.path === req.path; });
+    if (!item) {
+      toast('新窗口里找不到该文档：' + req.path + '（新窗口只能恢复「默认目录」的工作区）');
+      return;
+    }
+    await openFile(item);
+    if (req.anchor) scrollToAnchor(req.anchor);
+  }
+
   // 工作区跳转 / 图片放大预览
   function bindContentJumpEvents() {
       // 工作区内部 Markdown 跳转
@@ -1529,7 +1607,7 @@
           if (/^(data:|blob:)/i.test(pathPart)) return;
 
           // 外部链接（http / https / mailto / tel）：
-          // 「设置 → 链接在新窗口打开」开启时，用 window.open 在新窗口打开。
+          // 「设置 → 外部链接在新窗口打开」开启时，用 window.open 在新窗口打开。
           //
           // 为什么在**点击时**判定，而不是渲染时给 <a> 写 target="_blank"：
           //   1) 改设置立刻生效，不必为改一个开关重渲染整篇文档（重渲染有滚动/闪屏代价，见 §6.18）；
@@ -1552,6 +1630,14 @@
             // 但能按标题文本宽容匹配到」时才接管滚动 —— 手写 fragment 与渲染器生成 id
             // 常差在标点上（见 findAnchorElement）。两者都不中则仍交回浏览器。
             if (!anchor) return;
+            // 「工作区文档链接在新窗口打开」：当前文档自己的 #锚点也算文档链接 ——
+            // 在新标签页打开同一份文档并定位到那个标题，原窗口的阅读位置保持不变。
+            // 不满足前提（非默认目录 / 弹窗被拦截）时返回 false，继续走下面的原生行为。
+            if (state.settings.openInternalLinksInNewTab && state.currentPath &&
+                openInternalLinkNewTab(state.currentPath, anchor)) {
+              e.preventDefault();
+              return;
+            }
             if (document.getElementById(anchor)) return;
             if (!findAnchorElement(anchor)) return;
             e.preventDefault();
@@ -1572,6 +1658,11 @@
             } catch (err) {
               // 原样使用
             }
+            // 工作区文档链接在新窗口打开：新标签页靠 ?open=<路径>#<锚点> 自己恢复工作区
+            // 并打开该文档（详见 openInternalLinkNewTab）；前提不满足时它返回 false，
+            // 继续走下面的应用内跳转 —— 既不会开出一个空白窗口，也不会「点了没反应」。
+            if (state.settings.openInternalLinksInNewTab &&
+                openInternalLinkNewTab(target.path, decodedAnchor)) return;
             if (target.path === state.currentPath) {
               scrollToAnchor(decodedAnchor);
             } else {
@@ -1708,7 +1799,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.23)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.24)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
@@ -1729,7 +1820,13 @@
     setSidebarTab(state.sidebarTab);
     bindEvents();
     renderTree();
-    restoreDefaultDirectory();
+    restoreDefaultDirectory()
+      // 恢复完工作区再处理 ?open= 入口（新标签页由内部链接打开时才有这个参数）。
+      // 必须排在恢复之后：那时 state.files 才有内容，才找得到目标文档。
+      .then(openRequestedFileFromUrl)
+      .catch(function (e) {
+        console.warn('恢复默认目录失败', e);
+      });
   }
 
   if (document.readyState === 'loading') {

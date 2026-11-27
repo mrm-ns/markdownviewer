@@ -224,7 +224,9 @@
           // 外部链接是否新窗口打开：默认关闭，保持历史行为。
           // 与 commentItalic 同理用 === true —— 老版本设置里没有这个字段，
           // 若写成 !== false，老用户升级后会被判成「开启」，与默认值相反。
-          openLinksInNewTab: parsed.openLinksInNewTab === true
+          openLinksInNewTab: parsed.openLinksInNewTab === true,
+          // 工作区文档链接是否新窗口打开：同样默认关闭（=== true 才开）。
+          openInternalLinksInNewTab: parsed.openInternalLinksInNewTab === true
         };
       }
     } catch (e) {
@@ -285,8 +287,11 @@
     if (imageBgColor) imageBgColor.value = state.settings.imageBackgroundColor || '#ffffff';
     // 设置抽屉里的项也在这里回填：renderSettingsEditor() 是「设置 → 控件」的唯一出口，
     // 新增设置项只要往这里加一行，两个抽屉打开时都会同步（见 AGENTS §6.15 第 6 条）
-    const openLinksToggle = document.getElementById('open-links-new-tab-toggle');
+    const openLinksToggle = document.getElementById('open-external-links-new-tab-toggle');
     if (openLinksToggle) openLinksToggle.checked = !!state.settings.openLinksInNewTab;
+    // 两个链接开关相互独立：外部链接（http/https/mailto/tel）与工作区文档链接。
+    const openInternalLinksToggle = document.getElementById('open-internal-links-new-tab-toggle');
+    if (openInternalLinksToggle) openInternalLinksToggle.checked = !!state.settings.openInternalLinksInNewTab;
   }
 
 

@@ -16,7 +16,7 @@
   
 
   <!-- 应用自身布局样式 -->
-  <link rel="stylesheet" href="css/style.css?v=1.1.23">
+  <link rel="stylesheet" href="css/style.css?v=1.1.24">
 
   
   
@@ -277,12 +277,23 @@
       <div class="drawer-body">
         <div class="form-row">
           <label class="switch-label">
-            <input type="checkbox" id="open-links-new-tab-toggle">
-            <span>链接在新窗口打开</span>
+            <input type="checkbox" id="open-external-links-new-tab-toggle">
+            <span>外部链接在新窗口打开</span>
           </label>
           <div class="pdf-preview-hint">
-            只影响正文里的外部链接（http / https / mailto / tel）。工作区内部的文档链接始终在应用内打开，不受此项影响。
+            只影响正文里的外部链接（http / https / mailto / tel）。
             按住 Ctrl / ⌘ / Shift 点击时仍按浏览器原生行为（默认就在新标签页打开）。
+          </div>
+        </div>
+        <div class="form-row">
+          <label class="switch-label">
+            <input type="checkbox" id="open-internal-links-new-tab-toggle">
+            <span>工作区文档链接在新窗口打开</span>
+          </label>
+          <div class="pdf-preview-hint">
+            工作区内的文档链接（含 #标题 锚点）会在新标签页打开，并自动定位到目标文档 / 标题。
+            新标签页靠「默认目录」恢复工作区，所以只在当前文件夹是默认目录时生效；
+            临时打开的文件夹会继续在应用内跳转（否则新标签页里没有文件可打开）。
           </div>
         </div>
       </div>
@@ -327,6 +338,6 @@
   </div>
 
 
-  <script src="app.js?v=1.1.23"></script>
+  <script src="app.js?v=1.1.24"></script>
 </body>
 </html>
