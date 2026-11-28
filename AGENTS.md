@@ -59,7 +59,8 @@ markdownviewer/
 |---|---|
 | 主题系统 | `THEMES`、`COLOR_DEFS`、`BASE_COLORS`、`applyTheme`、`saveThemeToStorage` |
 | 导出 PDF 主题 | `PDF_LAYOUT_DEFS/DEFAULTS`、`normalizePdfLayout`、`buildPdfCss`、`buildPdfDocumentHtml`、`exportCurrentPdf`、`renderPdfLayoutEditor`、`refreshPdfPreview`、`generatePdfPreview`（硬约束见 §5.1、§6.16） |
-| 阅读设置 | `loadSettings`、`saveSettings`、`applySettings`（正文字号/代码字号/行内代码字号/图片背景） |
+| 阅读设置 | `loadSettings`、`saveSettings`、`applySettings`（正文字号/代码字号/行内代码字号/图片背景/阅读宽度） |
+| 阅读现场 | `loadReadingState`、`saveReadingState`、`restoreLastSessionDocument`、`rememberCurrentReadingPosition`、`loadSidebarWidth`/`applySidebarWidth`、`loadExpandedFolders`/`saveExpandedFolders`、`updateOutlineActive`、`toggleDarkMode`（见 §6.23） |
 | 文件系统 | `indexFiles`、`indexWrappedFiles`、`openFile`、`getFreshFile` |
 | 文件树 | `buildTree`、`renderTree`、`renderNode` |
 | 全文搜索 | `performContentSearch`、`renderSearchResults`、`buildSearchDirTree`、`countSearchDirHits` —— 结果**按目录归类**（目录树 → 文件 → 命中行）；目录收起态存 `state.searchCollapsedDirs`（存「收起」因为默认展开）、文件展开态存 `state.searchExpandedFiles`；结果每次整块重建 `innerHTML`，所以状态**必须放 state**（见 §6.22） |
@@ -710,6 +711,36 @@ fragment 可能是百分号编码（页内 `#%E5%9B%9B…` 不经过调用方解
 目录头点击只改 `style.display` / 箭头并写回 state（结果每次整块重建 `innerHTML`，不存 state 就丢）。
 纯逻辑可测：从 `src/24-core-files.js` 抽 `buildSearchDirTree` + `countSearchDirHits`，
 断言嵌套层级、同级排序、命中数汇总、根层文件不下沉、空结果不报错。
+
+### 6.23 阅读现场：三个 localStorage 键 + 三个 CSS 变量（v1.1.25）
+
+**阅读现场**＝「打开哪篇 / 读到哪 / 目录展开成什么样 / 侧栏多宽 / 正文栏多宽」，全部落 localStorage（含主题共 12 个键）：
+
+| 键 | 内容 | 写入时机 |
+|---|---|---|
+| `markdown-viewer-reading-state` | `{ lastPath, scrollByPath }`，scrollByPath 只留**最近 40 篇**（按 key 插入顺序裁剪） | 滚动 600ms 节流 / `beforeunload` / `visibilitychange==='hidden'` |
+| `markdown-viewer-sidebar-width` | 200–560 整数（默认 300） | 拖动松手 |
+| `markdown-viewer-expanded-folders` | 展开目录路径数组（上限 500） | 每次点开/收起目录 |
+
+**启动恢复顺序不能改**：`restoreDefaultDirectory()` → `openRequestedFileFromUrl()`（`?open=`）→ `restoreLastSessionDocument()`。
+后者开头 `if (readStartupOpenRequest()) return;`——`?open=` 是用户的显式意图，不能被「上次读的那篇」抢走；
+文件已不在工作区时**清掉 lastPath**（否则每次刷新都白找一遍）。
+
+**侧栏跟手 / 大纲跟随**：`openFile` 里先 `rememberCurrentReadingPosition()`（此时 `state.currentPath` 还是上一篇）再切文件，
+渲染后 `revealActiveFileInTree()` + `restoreReadingPositionFor(path)`。文件树只在 **active 项超出可视矩形**时才
+`scrollIntoView({block:'center'})`（无条件滚动会把用户手动滚到的位置拽走）。
+大纲高亮靠 `updateOutlineActive()`：取「标题顶边 ≤ 内容区顶 + `OUTLINE_ACTIVE_OFFSET`(96)」的**最后一个**标题下标。
+下标对齐的前提是 `renderOutline` 按正文标题出现顺序生成条目 —— **改了其中一侧的顺序，另一侧必须同步**。
+它只改 class 和 `scrollIntoView({block:'nearest'})`，**不碰正文滚动**（否则会与用户的滚动打架）。
+
+**两个宽度都是 CSS 变量，不要写死 px**：`--sidebar-width`（`.sidebar` 的 width）、`--md-reading-width`
+（`.markdown-body` 的 max-width，0 = 占满 → JS 写 `none`）。`normalizeReadingWidth` 必须**显式判空**：
+`Number('')` 与 `Number(null)` 都是 `0`，会被当成「占满窗口」。侧栏宽度同理（`loadSidebarWidth` 判 `raw == null || raw === ''`），
+否则没存过的用户会被夹到下限 200。
+
+**一键深色**：`#btn-toggle-dark` → `toggleDarkMode()` 翻转 `state.theme.isDark` 后走 `applyTheme()`
+（`data-app-theme` 属性的唯一写入点仍是 `applyTheme`，不要在按钮里自己设属性）。深色是**整个应用**的变化
+（工具栏/侧栏/正文背景），所以主题抽屉里那个开关的文案是「深色界面」，不要退回「深色文档背景」。
 
 ## 7. 如何测试
 

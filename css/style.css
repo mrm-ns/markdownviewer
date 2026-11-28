@@ -513,13 +513,40 @@ body.sidebar-collapsed .sidebar {
 }
 
 .sidebar {
-  width: 300px;
+  /* 宽度由 JS 写进 --sidebar-width（拖拽条 / 读取 localStorage），缺省仍是历史值 300px */
+  width: var(--sidebar-width, 300px);
+  flex-shrink: 0;
   min-width: 220px;
   background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* ===== 侧栏宽度拖拽条 ===== */
+.sidebar-resizer {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  /* 用透明 + hover 高亮：静默不抢视线，指到才提示「这里能拖」 */
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.sidebar-resizer:hover,
+body.resizing-sidebar .sidebar-resizer {
+  background: var(--active-bg, var(--sidebar-hover));
+}
+
+/* 拖拽期间禁掉选中与光标闪烁，否则拖过正文会选出一片文字 */
+body.resizing-sidebar {
+  cursor: col-resize;
+  user-select: none;
+}
+
+body.sidebar-collapsed .sidebar-resizer {
+  display: none;
 }
 
 .sidebar-tabs {
@@ -1058,7 +1085,8 @@ body.sidebar-collapsed .sidebar {
 }
 
 .markdown-body {
-  max-width: 900px;
+  /* 阅读宽度：设置 → 阅读宽度写进 --md-reading-width（0 = 占满窗口时 JS 写成 none） */
+  max-width: var(--md-reading-width, 900px);
   margin: 0 auto;
   padding: 24px 0 64px;
 }

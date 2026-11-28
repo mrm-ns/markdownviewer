@@ -16,7 +16,7 @@
   
 
   <!-- 应用自身布局样式 -->
-  <link rel="stylesheet" href="css/style.css?v=1.1.24">
+  <link rel="stylesheet" href="css/style.css?v=1.1.25">
 
   
   
@@ -70,6 +70,11 @@
       <div class="toolbar-right">
           <button id="btn-reload-file" class="btn" title="热重载当前文件">⟳</button>
 
+          <!-- 一键深色：直接翻转当前主题的 isDark（工具栏 / 侧栏 / 正文背景一起变），
+               不必先进「🎨 主题」抽屉再勾选；图标随实际模式更新（updateDarkModeButton） -->
+          <button id="btn-toggle-dark" class="btn-icon" title="切换到深色界面"
+                  aria-label="切换深色界面" aria-pressed="false">🌙</button>
+
           <!-- 设置：齿轮图标，只显示图标不带文字（标题栏右侧，点开是右侧设置抽屉） -->
           <button id="btn-settings" class="btn-icon" title="设置" aria-label="设置">⚙</button>
 
@@ -113,6 +118,11 @@
           <div id="outline-tree" class="file-tree"></div>
         </div>
       </aside>
+
+        <!-- 侧栏宽度拖拽条（v1.1.25）：5px 细条 + col-resize 光标，拖动改 --sidebar-width；
+             双击恢复默认 300px。侧栏收起时由 CSS 一起隐藏。 -->
+        <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-orientation="vertical"
+             title="拖动调整侧栏宽度（双击恢复默认 300px）"></div>
 
         <button id="sidebar-toggle-handle" class="sidebar-toggle-handle" title="收起/展开侧边栏">◀</button>
 
@@ -170,7 +180,7 @@
           <div class="form-row">
             <label class="switch-label">
               <input type="checkbox" id="theme-dark-toggle">
-              <span>使用深色文档背景</span>
+              <span>深色界面（工具栏 / 侧栏 / 正文背景一起变深）</span>
             </label>
           </div>
 
@@ -276,6 +286,20 @@
 
       <div class="drawer-body">
         <div class="form-row">
+          <label for="reading-width">阅读宽度</label>
+          <select id="reading-width">
+            <option value="760">窄（760px）</option>
+            <option value="900">标准（900px，默认）</option>
+            <option value="1100">宽（1100px）</option>
+            <option value="1400">很宽（1400px）</option>
+            <option value="0">占满窗口</option>
+          </select>
+          <div class="pdf-preview-hint">
+            只影响阅读时的正文栏宽度（长行更好读）；导出的 HTML / PDF 版式不受影响。
+            正文字号仍在「🎨 主题 → 阅读设置」里。
+          </div>
+        </div>
+        <div class="form-row">
           <label class="switch-label">
             <input type="checkbox" id="open-external-links-new-tab-toggle">
             <span>外部链接在新窗口打开</span>
@@ -338,6 +362,6 @@
   </div>
 
 
-  <script src="app.js?v=1.1.24"></script>
+  <script src="app.js?v=1.1.25"></script>
 </body>
 </html>

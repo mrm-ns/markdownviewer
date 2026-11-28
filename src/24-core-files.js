@@ -661,6 +661,10 @@
       html += '<div class="outline-item" data-target="' + escapeHtml(id) + '" style="padding-left:' + (level * 12) + 'px">' + escapeHtml(text) + '</div>';
     });
     container.innerHTML = html || '<div class="empty-tip">当前文档没有标题</div>';
+    // 大纲跟随阅读位置：重建 DOM 后立刻按当前滚动位置高亮一次，并确保滚动监听已挂上
+    // （监听只挂一次；切到「当前大纲」页签、正文重渲染都会走到这里）
+    bindOutlineSpy();
+    scheduleOutlineActiveUpdate();
   }
 
   function setSidebarTab(tab) {
@@ -729,6 +733,254 @@
     updateToolbarHandle();
   }
 
+  // ---------- 阅读现场：会话恢复 / 侧栏宽度 / 目录展开态（v1.1.25） ----------
+  // 三份数据都放 localStorage：它们只有几百字节，是「设置级」数据，且必须在启动时**同步**可用
+  // （IndexedDB 是异步的，会让「恢复上次读到的位置」晚一拍、先闪一下页首）。
+  const READING_STATE_KEY = 'markdown-viewer-reading-state';
+  const READING_STATE_MAX_FILES = 40;   // 只记最近读过的 40 篇，避免长年累积
+  const SIDEBAR_WIDTH_KEY = 'markdown-viewer-sidebar-width';
+  const EXPANDED_FOLDERS_KEY = 'markdown-viewer-expanded-folders';
+  const EXPANDED_FOLDERS_MAX = 500;     // 超大目录树也不至于把 localStorage 写爆
+  const SIDEBAR_WIDTH_MIN = 200;
+  const SIDEBAR_WIDTH_MAX = 560;
+  const SIDEBAR_WIDTH_DEFAULT = 300;
+
+  // 滚动位置一律夹取后再用：坏数据（负数 / 天文数字 / NaN）会把页面推到看不见的地方
+  function sanitizeScrollTop(value) {
+    const n = Number(value);
+    if (!isFinite(n) || n <= 0) return 0;
+    return Math.round(Math.min(n, 10000000));
+  }
+
+  function loadReadingState() {
+    state.readingState.lastPath = null;
+    state.readingState.scrollByPath = {};
+    let parsed = null;
+    try {
+      parsed = JSON.parse(localStorage.getItem(READING_STATE_KEY) || 'null');
+    } catch (e) {
+      parsed = null;   // 坏数据直接丢弃：宁可没有阅读现场，也不要因为一段脏 JSON 起不来
+    }
+    if (!parsed || typeof parsed !== 'object') return;
+    if (typeof parsed.lastPath === 'string' && parsed.lastPath) {
+      state.readingState.lastPath = parsed.lastPath;
+    }
+    const scrollByPath = parsed.scrollByPath;
+    if (scrollByPath && typeof scrollByPath === 'object') {
+      Object.keys(scrollByPath).forEach(function (path) {
+        if (typeof path !== 'string' || !path) return;
+        state.readingState.scrollByPath[path] = sanitizeScrollTop(scrollByPath[path]);
+      });
+    }
+  }
+
+  function saveReadingState() {
+    const snapshot = { lastPath: state.readingState.lastPath || null, scrollByPath: {} };
+    // 对象 key 保持插入顺序，超出上限就丢掉最早写进去的那几篇
+    const keep = Object.keys(state.readingState.scrollByPath).slice(-READING_STATE_MAX_FILES);
+    keep.forEach(function (path) {
+      snapshot.scrollByPath[path] = state.readingState.scrollByPath[path];
+    });
+    state.readingState.scrollByPath = snapshot.scrollByPath;
+    try {
+      localStorage.setItem(READING_STATE_KEY, JSON.stringify(snapshot));
+    } catch (e) {
+      // ignore（隐私模式 / 配额满：功能降级，但不影响阅读）
+    }
+  }
+
+  // 记录「当前文档读到哪里」。正文区 .content 是主滚动容器，window 在个别场景（整页撑高）也会滚，
+  // 取两者较大值即可（与 scrollToSourceLine 的口径一致）。
+  function rememberCurrentReadingPosition() {
+    if (!state.currentPath) return;
+    const contentEl = document.querySelector('.content');
+    const contentTop = contentEl ? contentEl.scrollTop : 0;
+    const winTop = window.scrollY || document.documentElement.scrollTop || 0;
+    const top = Math.max(contentTop, winTop);
+    if (top > 0) state.readingState.scrollByPath[state.currentPath] = sanitizeScrollTop(top);
+    state.readingState.lastPath = state.currentPath;
+  }
+
+  function restoreReadingPositionFor(path) {
+    const top = path ? state.readingState.scrollByPath[path] : 0;
+    if (!top) return;
+    const contentEl = document.querySelector('.content');
+    if (contentEl) contentEl.scrollTop = top;
+    window.scrollTo(0, top);   // 兜底：window 滚动的情形（contentEl 没有可滚内容时它才是滚动的那个）
+    scheduleOutlineActiveUpdate();
+  }
+
+  // 启动时恢复上次读到的文档。必须在 restoreDefaultDirectory() 之后调用（那时 state.files 才有内容）。
+  // ?open= 入口优先：它是「用户明确要看这篇」，不能被上次的阅读现场抢走。
+  async function restoreLastSessionDocument() {
+    if (typeof readStartupOpenRequest === 'function' && readStartupOpenRequest()) return;
+    const path = state.readingState.lastPath;
+    if (!path) return;
+    if (state.currentPath === path) return;      // 已经打开了，不重复渲染
+    const item = state.files.find(function (f) { return f.path === path; });
+    if (!item) {
+      // 文档被删除 / 改名 / 换了工作区：清掉记忆，否则每次启动都白找一次
+      state.readingState.lastPath = null;
+      delete state.readingState.scrollByPath[path];
+      saveReadingState();
+      return;
+    }
+    await openFile(item);
+  }
+
+  // ---------- 侧栏宽度（拖拽条） ----------
+  function clampSidebarWidth(width) {
+    const n = Number(width);
+    if (!isFinite(n) || n <= 0) return SIDEBAR_WIDTH_DEFAULT;
+    return Math.round(Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, n)));
+  }
+
+  function applySidebarWidth(width) {
+    const w = clampSidebarWidth(width);
+    state.sidebarWidth = w;
+    // 只写一个 CSS 变量：.sidebar 的 width 由它决定，收起态等其它规则都不用改
+    document.documentElement.style.setProperty('--sidebar-width', w + 'px');
+    return w;
+  }
+
+  function loadSidebarWidth() {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    } catch (e) {
+      raw = null;
+    }
+    // 注意 Number(null) 是 0、Number('') 也是 0 —— 必须显式判「没存过」，否则默认值会被夹成下限
+    applySidebarWidth(raw == null || raw === '' ? SIDEBAR_WIDTH_DEFAULT : raw);
+  }
+
+  function saveSidebarWidth(width) {
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clampSidebarWidth(width)));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // ---------- 目录展开态持久化 ----------
+  // state.expandedFolders 原本只在内存里，刷新页面后整棵树回到全收起（几百个目录要点开一遍）。
+  function loadExpandedFolders() {
+    let parsed = null;
+    try {
+      parsed = JSON.parse(localStorage.getItem(EXPANDED_FOLDERS_KEY) || 'null');
+    } catch (e) {
+      parsed = null;
+    }
+    if (!Array.isArray(parsed)) return;
+    parsed.slice(0, EXPANDED_FOLDERS_MAX).forEach(function (path) {
+      if (typeof path === 'string' && path) state.expandedFolders.add(path);
+    });
+  }
+
+  function saveExpandedFolders() {
+    try {
+      localStorage.setItem(EXPANDED_FOLDERS_KEY,
+        JSON.stringify(Array.from(state.expandedFolders).slice(0, EXPANDED_FOLDERS_MAX)));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // ---------- 侧栏跟手：把当前文档滚进文档列表视野 ----------
+  // renderTree 每次整块重建 DOM，且只给当前文件挂 .active —— 深目录里的文档打开后，
+  // 侧栏那条根本不在可见区域，用户以为「没选中」。这里只在确实跑出视野时才滚（避免每点一次都抖一下）。
+  function revealActiveFileInTree() {
+    if (state.sidebarTab !== 'files') return;
+    const tree = document.getElementById('file-tree');
+    if (!tree) return;
+    const active = tree.querySelector('.file-item.active');
+    if (!active) return;
+    const treeRect = tree.getBoundingClientRect();
+    const rect = active.getBoundingClientRect();
+    if (rect.top >= treeRect.top && rect.bottom <= treeRect.bottom) return;   // 已经在视野里
+    if (typeof active.scrollIntoView === 'function') active.scrollIntoView({ block: 'center' });
+  }
+
+  // ---------- 大纲跟随阅读位置 ----------
+  // CSS 里早就有 .outline-item.active（css/style.css），但从来没人赋值 ——
+  // 「当前大纲」于是只是一份死列表：读到哪里都不会高亮，也看不出当前在哪一节。
+  let outlineSpyRaf = 0;
+  let outlineSpyBound = false;
+
+  // 判定线：标题顶边进入「内容区顶部往下 96px」即算正在读（约等于阅读视线起点）
+  const OUTLINE_ACTIVE_OFFSET = 96;
+
+  function updateOutlineActive() {
+    outlineSpyRaf = 0;
+    const tree = document.getElementById('outline-tree');
+    const body = document.getElementById('markdown-body');
+    if (!tree || !body) return;
+    const items = tree.querySelectorAll('.outline-item');
+    if (!items.length) return;
+    const scrollEl = document.querySelector('.content');
+    const refRect = (scrollEl || document.documentElement).getBoundingClientRect();
+    const lineY = refRect.top + OUTLINE_ACTIVE_OFFSET;
+    // renderOutline 按「正文里标题的出现顺序」逐条生成，所以下标天然对齐
+    const headings = body.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    let activeIndex = -1;
+    headings.forEach(function (h, i) {
+      if (h.getBoundingClientRect().top <= lineY) activeIndex = i;
+    });
+    if (activeIndex > items.length - 1) activeIndex = items.length - 1;
+    items.forEach(function (item, i) {
+      item.classList.toggle('active', i === activeIndex);
+    });
+    // 高亮项跟着滚进大纲面板的视野（block:'nearest' = 已在视野里就不动）
+    if (activeIndex >= 0 && items[activeIndex] && typeof items[activeIndex].scrollIntoView === 'function') {
+      items[activeIndex].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function scheduleOutlineActiveUpdate() {
+    if (!state.currentPath) return;
+    if (state.sidebarTab !== 'outline') return;
+    if (outlineSpyRaf) return;
+    if (typeof requestAnimationFrame !== 'function') {
+      updateOutlineActive();
+      return;
+    }
+    outlineSpyRaf = requestAnimationFrame(updateOutlineActive);
+  }
+
+  function bindOutlineSpy() {
+    if (outlineSpyBound) return;
+    outlineSpyBound = true;
+    const scrollEl = document.querySelector('.content');
+    if (scrollEl) scrollEl.addEventListener('scroll', scheduleOutlineActiveUpdate, { passive: true });
+    window.addEventListener('scroll', scheduleOutlineActiveUpdate, { passive: true });
+    window.addEventListener('resize', scheduleOutlineActiveUpdate);
+  }
+
+  // ---------- 阅读现场落盘（滚动时节流写，离开页面前立刻写） ----------
+  let readingSaveTimer = 0;
+
+  function bindReadingStateTracking() {
+    const persist = function () {
+      rememberCurrentReadingPosition();
+      saveReadingState();
+    };
+    const schedule = function () {
+      if (readingSaveTimer) return;
+      readingSaveTimer = setTimeout(function () {
+        readingSaveTimer = 0;
+        persist();
+      }, 600);
+    };
+    const scrollEl = document.querySelector('.content');
+    if (scrollEl) scrollEl.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('scroll', schedule, { passive: true });
+    // beforeunload + visibilitychange 两条都挂：前者覆盖关闭 / 刷新，后者覆盖切标签页 / 手机后台
+    window.addEventListener('beforeunload', persist);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') persist();
+    });
+  }
+
 
 
   async function getFreshFile(item) {
@@ -760,6 +1012,8 @@
 
   async function openFile(item, keepScroll) {
     if (!item || !item.file) return;
+    // 切走之前先记住上一篇读到哪儿（此时 state.currentPath 还是上一篇）
+    rememberCurrentReadingPosition();
     try {
       const file = await getFreshFile(item);
       const text = await readFileText(file);
@@ -780,6 +1034,14 @@
 
       document.title = item.name + ' - Markdown Viewer';
       renderTree();
+      // 侧栏跟手：让当前文档那条滚进文档列表可见区域
+      revealActiveFileInTree();
+      // 会话恢复：记下「当前在读哪篇」，并把这篇上次读到的位置滚回来。
+      // 注意 keepScroll 分支在上面已把 scrollTop 归零/保留，这里统一覆盖为记忆值：
+      // 刷新当前文件时记忆值就等于刚才的位置，行为与历史一致。
+      state.readingState.lastPath = item.path;
+      saveReadingState();
+      restoreReadingPositionFor(item.path);
     } catch (err) {
       console.error(err);
       toast('读取文件失败：' + err.message);

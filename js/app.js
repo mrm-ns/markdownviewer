@@ -692,6 +692,9 @@
       // 只作用于阅读器里的点击（见 bindContentJumpEvents 的链接处理）；
       // 导出的 HTML 不含这个开关的影响。
       openLinksInNewTab: false,
+      // 阅读宽度（v1.1.25）：正文栏最大宽度（px），0 = 占满窗口。
+      // 只影响阅读界面 —— 导出的 HTML / PDF 仍用各自的版式（§5.1），不读这个值。
+      readingWidth: 900,
       // 工作区**内部文档链接**（含 #标题 锚点）是否在新窗口打开。
       // 与上面的外部链接开关相互独立：两个都开 = 所有链接都新窗口。
       // 实现上不是 window.open(href) —— 应用没有文件级 URL，只能打开
@@ -714,8 +717,16 @@
     userThemes: [],     // 用户导入的主题，会出现在预设下拉框中
     sidebarTab: 'files',
     sidebarCollapsed: false,
+    // 侧栏宽度（v1.1.25）：拖拽条改这里，并落 localStorage。
+    // CSS 通过 --sidebar-width 消费它，所以只在 applySidebarWidth() 里写一处。
+    sidebarWidth: 300,
     toolbarCollapsed: false,
+    // 目录展开态：现在会持久化到 localStorage（刷新后仍保持展开）
     expandedFolders: new Set(), // 文件树中已展开的目录路径（默认收起）
+    // 阅读现场（v1.1.25）：lastPath = 上次读到的文档；scrollByPath = 每篇文档的滚动位置。
+    // 两者都存在 localStorage（见 24-core-files.js 的 loadReadingState / saveReadingState），
+    // 启动时先恢复目录、再恢复文档与滚动位置。
+    readingState: { lastPath: null, scrollByPath: {} },
     pdfColors: Object.assign({}, PDF_BASE_COLORS), // 导出 PDF 配色
     pdfLayout: Object.assign({}, PDF_LAYOUT_DEFAULTS), // 导出 PDF 版式（字号/行高/纸张/字体），与阅读器 state.settings 无关
     pdfPreviewBody: null, // PDF 预览缓存的正文 HTML（图片已内联）；正文重渲染时置空
@@ -2612,6 +2623,10 @@
       html += '<div class="outline-item" data-target="' + escapeHtml(id) + '" style="padding-left:' + (level * 12) + 'px">' + escapeHtml(text) + '</div>';
     });
     container.innerHTML = html || '<div class="empty-tip">当前文档没有标题</div>';
+    // 大纲跟随阅读位置：重建 DOM 后立刻按当前滚动位置高亮一次，并确保滚动监听已挂上
+    // （监听只挂一次；切到「当前大纲」页签、正文重渲染都会走到这里）
+    bindOutlineSpy();
+    scheduleOutlineActiveUpdate();
   }
 
   function setSidebarTab(tab) {
@@ -2680,6 +2695,254 @@
     updateToolbarHandle();
   }
 
+  // ---------- 阅读现场：会话恢复 / 侧栏宽度 / 目录展开态（v1.1.25） ----------
+  // 三份数据都放 localStorage：它们只有几百字节，是「设置级」数据，且必须在启动时**同步**可用
+  // （IndexedDB 是异步的，会让「恢复上次读到的位置」晚一拍、先闪一下页首）。
+  const READING_STATE_KEY = 'markdown-viewer-reading-state';
+  const READING_STATE_MAX_FILES = 40;   // 只记最近读过的 40 篇，避免长年累积
+  const SIDEBAR_WIDTH_KEY = 'markdown-viewer-sidebar-width';
+  const EXPANDED_FOLDERS_KEY = 'markdown-viewer-expanded-folders';
+  const EXPANDED_FOLDERS_MAX = 500;     // 超大目录树也不至于把 localStorage 写爆
+  const SIDEBAR_WIDTH_MIN = 200;
+  const SIDEBAR_WIDTH_MAX = 560;
+  const SIDEBAR_WIDTH_DEFAULT = 300;
+
+  // 滚动位置一律夹取后再用：坏数据（负数 / 天文数字 / NaN）会把页面推到看不见的地方
+  function sanitizeScrollTop(value) {
+    const n = Number(value);
+    if (!isFinite(n) || n <= 0) return 0;
+    return Math.round(Math.min(n, 10000000));
+  }
+
+  function loadReadingState() {
+    state.readingState.lastPath = null;
+    state.readingState.scrollByPath = {};
+    let parsed = null;
+    try {
+      parsed = JSON.parse(localStorage.getItem(READING_STATE_KEY) || 'null');
+    } catch (e) {
+      parsed = null;   // 坏数据直接丢弃：宁可没有阅读现场，也不要因为一段脏 JSON 起不来
+    }
+    if (!parsed || typeof parsed !== 'object') return;
+    if (typeof parsed.lastPath === 'string' && parsed.lastPath) {
+      state.readingState.lastPath = parsed.lastPath;
+    }
+    const scrollByPath = parsed.scrollByPath;
+    if (scrollByPath && typeof scrollByPath === 'object') {
+      Object.keys(scrollByPath).forEach(function (path) {
+        if (typeof path !== 'string' || !path) return;
+        state.readingState.scrollByPath[path] = sanitizeScrollTop(scrollByPath[path]);
+      });
+    }
+  }
+
+  function saveReadingState() {
+    const snapshot = { lastPath: state.readingState.lastPath || null, scrollByPath: {} };
+    // 对象 key 保持插入顺序，超出上限就丢掉最早写进去的那几篇
+    const keep = Object.keys(state.readingState.scrollByPath).slice(-READING_STATE_MAX_FILES);
+    keep.forEach(function (path) {
+      snapshot.scrollByPath[path] = state.readingState.scrollByPath[path];
+    });
+    state.readingState.scrollByPath = snapshot.scrollByPath;
+    try {
+      localStorage.setItem(READING_STATE_KEY, JSON.stringify(snapshot));
+    } catch (e) {
+      // ignore（隐私模式 / 配额满：功能降级，但不影响阅读）
+    }
+  }
+
+  // 记录「当前文档读到哪里」。正文区 .content 是主滚动容器，window 在个别场景（整页撑高）也会滚，
+  // 取两者较大值即可（与 scrollToSourceLine 的口径一致）。
+  function rememberCurrentReadingPosition() {
+    if (!state.currentPath) return;
+    const contentEl = document.querySelector('.content');
+    const contentTop = contentEl ? contentEl.scrollTop : 0;
+    const winTop = window.scrollY || document.documentElement.scrollTop || 0;
+    const top = Math.max(contentTop, winTop);
+    if (top > 0) state.readingState.scrollByPath[state.currentPath] = sanitizeScrollTop(top);
+    state.readingState.lastPath = state.currentPath;
+  }
+
+  function restoreReadingPositionFor(path) {
+    const top = path ? state.readingState.scrollByPath[path] : 0;
+    if (!top) return;
+    const contentEl = document.querySelector('.content');
+    if (contentEl) contentEl.scrollTop = top;
+    window.scrollTo(0, top);   // 兜底：window 滚动的情形（contentEl 没有可滚内容时它才是滚动的那个）
+    scheduleOutlineActiveUpdate();
+  }
+
+  // 启动时恢复上次读到的文档。必须在 restoreDefaultDirectory() 之后调用（那时 state.files 才有内容）。
+  // ?open= 入口优先：它是「用户明确要看这篇」，不能被上次的阅读现场抢走。
+  async function restoreLastSessionDocument() {
+    if (typeof readStartupOpenRequest === 'function' && readStartupOpenRequest()) return;
+    const path = state.readingState.lastPath;
+    if (!path) return;
+    if (state.currentPath === path) return;      // 已经打开了，不重复渲染
+    const item = state.files.find(function (f) { return f.path === path; });
+    if (!item) {
+      // 文档被删除 / 改名 / 换了工作区：清掉记忆，否则每次启动都白找一次
+      state.readingState.lastPath = null;
+      delete state.readingState.scrollByPath[path];
+      saveReadingState();
+      return;
+    }
+    await openFile(item);
+  }
+
+  // ---------- 侧栏宽度（拖拽条） ----------
+  function clampSidebarWidth(width) {
+    const n = Number(width);
+    if (!isFinite(n) || n <= 0) return SIDEBAR_WIDTH_DEFAULT;
+    return Math.round(Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, n)));
+  }
+
+  function applySidebarWidth(width) {
+    const w = clampSidebarWidth(width);
+    state.sidebarWidth = w;
+    // 只写一个 CSS 变量：.sidebar 的 width 由它决定，收起态等其它规则都不用改
+    document.documentElement.style.setProperty('--sidebar-width', w + 'px');
+    return w;
+  }
+
+  function loadSidebarWidth() {
+    let raw = null;
+    try {
+      raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    } catch (e) {
+      raw = null;
+    }
+    // 注意 Number(null) 是 0、Number('') 也是 0 —— 必须显式判「没存过」，否则默认值会被夹成下限
+    applySidebarWidth(raw == null || raw === '' ? SIDEBAR_WIDTH_DEFAULT : raw);
+  }
+
+  function saveSidebarWidth(width) {
+    try {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, String(clampSidebarWidth(width)));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // ---------- 目录展开态持久化 ----------
+  // state.expandedFolders 原本只在内存里，刷新页面后整棵树回到全收起（几百个目录要点开一遍）。
+  function loadExpandedFolders() {
+    let parsed = null;
+    try {
+      parsed = JSON.parse(localStorage.getItem(EXPANDED_FOLDERS_KEY) || 'null');
+    } catch (e) {
+      parsed = null;
+    }
+    if (!Array.isArray(parsed)) return;
+    parsed.slice(0, EXPANDED_FOLDERS_MAX).forEach(function (path) {
+      if (typeof path === 'string' && path) state.expandedFolders.add(path);
+    });
+  }
+
+  function saveExpandedFolders() {
+    try {
+      localStorage.setItem(EXPANDED_FOLDERS_KEY,
+        JSON.stringify(Array.from(state.expandedFolders).slice(0, EXPANDED_FOLDERS_MAX)));
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // ---------- 侧栏跟手：把当前文档滚进文档列表视野 ----------
+  // renderTree 每次整块重建 DOM，且只给当前文件挂 .active —— 深目录里的文档打开后，
+  // 侧栏那条根本不在可见区域，用户以为「没选中」。这里只在确实跑出视野时才滚（避免每点一次都抖一下）。
+  function revealActiveFileInTree() {
+    if (state.sidebarTab !== 'files') return;
+    const tree = document.getElementById('file-tree');
+    if (!tree) return;
+    const active = tree.querySelector('.file-item.active');
+    if (!active) return;
+    const treeRect = tree.getBoundingClientRect();
+    const rect = active.getBoundingClientRect();
+    if (rect.top >= treeRect.top && rect.bottom <= treeRect.bottom) return;   // 已经在视野里
+    if (typeof active.scrollIntoView === 'function') active.scrollIntoView({ block: 'center' });
+  }
+
+  // ---------- 大纲跟随阅读位置 ----------
+  // CSS 里早就有 .outline-item.active（css/style.css），但从来没人赋值 ——
+  // 「当前大纲」于是只是一份死列表：读到哪里都不会高亮，也看不出当前在哪一节。
+  let outlineSpyRaf = 0;
+  let outlineSpyBound = false;
+
+  // 判定线：标题顶边进入「内容区顶部往下 96px」即算正在读（约等于阅读视线起点）
+  const OUTLINE_ACTIVE_OFFSET = 96;
+
+  function updateOutlineActive() {
+    outlineSpyRaf = 0;
+    const tree = document.getElementById('outline-tree');
+    const body = document.getElementById('markdown-body');
+    if (!tree || !body) return;
+    const items = tree.querySelectorAll('.outline-item');
+    if (!items.length) return;
+    const scrollEl = document.querySelector('.content');
+    const refRect = (scrollEl || document.documentElement).getBoundingClientRect();
+    const lineY = refRect.top + OUTLINE_ACTIVE_OFFSET;
+    // renderOutline 按「正文里标题的出现顺序」逐条生成，所以下标天然对齐
+    const headings = body.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    let activeIndex = -1;
+    headings.forEach(function (h, i) {
+      if (h.getBoundingClientRect().top <= lineY) activeIndex = i;
+    });
+    if (activeIndex > items.length - 1) activeIndex = items.length - 1;
+    items.forEach(function (item, i) {
+      item.classList.toggle('active', i === activeIndex);
+    });
+    // 高亮项跟着滚进大纲面板的视野（block:'nearest' = 已在视野里就不动）
+    if (activeIndex >= 0 && items[activeIndex] && typeof items[activeIndex].scrollIntoView === 'function') {
+      items[activeIndex].scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function scheduleOutlineActiveUpdate() {
+    if (!state.currentPath) return;
+    if (state.sidebarTab !== 'outline') return;
+    if (outlineSpyRaf) return;
+    if (typeof requestAnimationFrame !== 'function') {
+      updateOutlineActive();
+      return;
+    }
+    outlineSpyRaf = requestAnimationFrame(updateOutlineActive);
+  }
+
+  function bindOutlineSpy() {
+    if (outlineSpyBound) return;
+    outlineSpyBound = true;
+    const scrollEl = document.querySelector('.content');
+    if (scrollEl) scrollEl.addEventListener('scroll', scheduleOutlineActiveUpdate, { passive: true });
+    window.addEventListener('scroll', scheduleOutlineActiveUpdate, { passive: true });
+    window.addEventListener('resize', scheduleOutlineActiveUpdate);
+  }
+
+  // ---------- 阅读现场落盘（滚动时节流写，离开页面前立刻写） ----------
+  let readingSaveTimer = 0;
+
+  function bindReadingStateTracking() {
+    const persist = function () {
+      rememberCurrentReadingPosition();
+      saveReadingState();
+    };
+    const schedule = function () {
+      if (readingSaveTimer) return;
+      readingSaveTimer = setTimeout(function () {
+        readingSaveTimer = 0;
+        persist();
+      }, 600);
+    };
+    const scrollEl = document.querySelector('.content');
+    if (scrollEl) scrollEl.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('scroll', schedule, { passive: true });
+    // beforeunload + visibilitychange 两条都挂：前者覆盖关闭 / 刷新，后者覆盖切标签页 / 手机后台
+    window.addEventListener('beforeunload', persist);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') persist();
+    });
+  }
+
 
 
   async function getFreshFile(item) {
@@ -2711,6 +2974,8 @@
 
   async function openFile(item, keepScroll) {
     if (!item || !item.file) return;
+    // 切走之前先记住上一篇读到哪儿（此时 state.currentPath 还是上一篇）
+    rememberCurrentReadingPosition();
     try {
       const file = await getFreshFile(item);
       const text = await readFileText(file);
@@ -2731,6 +2996,14 @@
 
       document.title = item.name + ' - Markdown Viewer';
       renderTree();
+      // 侧栏跟手：让当前文档那条滚进文档列表可见区域
+      revealActiveFileInTree();
+      // 会话恢复：记下「当前在读哪篇」，并把这篇上次读到的位置滚回来。
+      // 注意 keepScroll 分支在上面已把 scrollTop 归零/保留，这里统一覆盖为记忆值：
+      // 刷新当前文件时记忆值就等于刚才的位置，行为与历史一致。
+      state.readingState.lastPath = item.path;
+      saveReadingState();
+      restoreReadingPositionFor(item.path);
     } catch (err) {
       console.error(err);
       toast('读取文件失败：' + err.message);
@@ -5648,8 +5921,29 @@
     style.textContent = themeCss(theme);
 
     document.documentElement.setAttribute('data-app-theme', theme.isDark ? 'dark' : 'light');
-    
-    
+    // 工具栏「一键深色」按钮的图标跟着实际模式走（从主题抽屉、预设、导入主题改模式时都同步）
+    updateDarkModeButton();
+  }
+
+  // ---------- 一键深色（v1.1.25） ----------
+  // 旧路径要「🎨 主题 → 勾选深色 → 保存」，而且文案写的是「深色文档背景」，
+  // 实际却把工具栏 / 侧栏 / 正文背景整体切成深色 —— 说明与行为不符、入口也太深。
+  function updateDarkModeButton() {
+    const btn = document.getElementById('btn-toggle-dark');
+    if (!btn) return;
+    const dark = !!(state.theme && state.theme.isDark);
+    btn.textContent = dark ? '☀️' : '🌙';
+    btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    btn.title = dark ? '切换到浅色界面' : '切换到深色界面';
+  }
+
+  // 只翻转 isDark（不动配色方案），等价于主题抽屉里的那个复选框，但一次点击完成。
+  function toggleDarkMode() {
+    state.theme.isDark = !state.theme.isDark;
+    applyTheme();
+    renderThemeEditor();   // 主题抽屉里的复选框 / 预览保持同步
+    saveThemeToStorage();
+    toast(state.theme.isDark ? '已切换到深色界面' : '已切换到浅色界面');
   }
 
   function saveThemeToStorage() {
@@ -5793,6 +6087,10 @@
           // 与 commentItalic 同理用 === true —— 老版本设置里没有这个字段，
           // 若写成 !== false，老用户升级后会被判成「开启」，与默认值相反。
           openLinksInNewTab: parsed.openLinksInNewTab === true,
+          // 阅读宽度（v1.1.25）：0 = 占满窗口。
+          // 老版本设置里没有这个字段 → normalizeReadingWidth(undefined) 返回默认 900，
+          // 与历史版式完全一致（不能因为升级就把正文拉宽）。
+          readingWidth: normalizeReadingWidth(parsed.readingWidth),
           // 工作区文档链接是否新窗口打开：同样默认关闭（=== true 才开）。
           openInternalLinksInNewTab: parsed.openInternalLinksInNewTab === true
         };
@@ -5823,6 +6121,18 @@
     }
   }
 
+  // 阅读宽度校验：0 表示「占满窗口」（CSS 侧写成 max-width: none），
+  // 其余夹在 600–1600 之间。注意 Number('') === 0 且 Number(undefined) === NaN ——
+  // 因此「没存过」和「清空输入框」都必须显式回落到默认值 900，不能靠 ||。
+  function normalizeReadingWidth(value) {
+    if (value === 0 || value === '0') return 0;
+    if (value === undefined || value === null || value === '') return 900;
+    const n = Number(value);
+    if (!isFinite(n)) return 900;
+    if (n === 0) return 0;
+    return Math.round(Math.min(1600, Math.max(600, n)));
+  }
+
   function applySettings() {
     const root = document.documentElement;
     root.style.setProperty('--md-text-size', state.settings.textSize + 'px');
@@ -5835,6 +6145,9 @@
     // 背景必须与图片**完全贴合**：留内边距会像「相框把图片包起来」，
     // 所以这里恒为 0（保留变量是为了样式表里有一处可覆盖的入口）。
     root.style.setProperty('--md-image-padding', '0px');
+    // 阅读宽度：0 = 占满窗口 → 写 none（不能写 0px，那会把正文压成一条线）
+    root.style.setProperty('--md-reading-width',
+      state.settings.readingWidth > 0 ? state.settings.readingWidth + 'px' : 'none');
     // 注释斜体是写在 themeCss 生成的那段 CSS 里的（不是 CSS 变量），
     // 所以改设置后必须重新生成主题样式，否则开关要等切主题才生效。
     applyTheme();
@@ -5860,6 +6173,9 @@
     // 两个链接开关相互独立：外部链接（http/https/mailto/tel）与工作区文档链接。
     const openInternalLinksToggle = document.getElementById('open-internal-links-new-tab-toggle');
     if (openInternalLinksToggle) openInternalLinksToggle.checked = !!state.settings.openInternalLinksInNewTab;
+    // 阅读宽度（设置抽屉）：0 也要能回填（String(0) === '0'，对应 <option value="0">占满窗口</option>）
+    const readingWidthSelect = document.getElementById('reading-width');
+    if (readingWidthSelect) readingWidthSelect.value = String(state.settings.readingWidth);
   }
 
 
@@ -6303,7 +6619,60 @@
     bindSidebarMenuEvents();
     bindContentMenuEvents();
     bindContentJumpEvents();
+    // 工具栏 / 侧栏的快捷交互（一键深色、侧栏拖宽）
+    bindQuickToggleEvents();
     bindGlobalEvents();
+  }
+
+  // 工具栏 / 侧栏快捷交互（v1.1.25）：一键深色 + 侧栏宽度拖拽。
+  // 两者都只碰 CSS 变量 / localStorage，不重建正文 DOM，代价可以忽略。
+  function bindQuickToggleEvents() {
+    const darkBtn = document.getElementById('btn-toggle-dark');
+    if (darkBtn) {
+      darkBtn.addEventListener('click', toggleDarkMode);
+    }
+    bindSidebarResize();
+  }
+
+  // 侧栏拖宽：mousedown 时才把 mousemove / mouseup 挂到 document，
+  // 这样鼠标拖到正文、甚至拖出窗口也不会丢事件；松手立刻摘掉，避免常驻监听。
+  function bindSidebarResize() {
+    const resizer = document.getElementById('sidebar-resizer');
+    if (!resizer) return;
+    let dragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    function onMove(e) {
+      if (!dragging) return;
+      applySidebarWidth(startWidth + (e.clientX - startX));
+    }
+
+    function onUp() {
+      if (!dragging) return;
+      dragging = false;
+      document.body.classList.remove('resizing-sidebar');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      saveSidebarWidth(state.sidebarWidth);
+    }
+
+    resizer.addEventListener('mousedown', function (e) {
+      if (e.button !== 0 || state.sidebarCollapsed) return;
+      dragging = true;
+      startX = e.clientX;
+      startWidth = state.sidebarWidth || SIDEBAR_WIDTH_DEFAULT;
+      document.body.classList.add('resizing-sidebar');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();   // 否则拖拽会变成「选中一片文字」
+    });
+
+    // 双击回到默认宽度（拖窄了不必一点点拖回来）
+    resizer.addEventListener('dblclick', function () {
+      applySidebarWidth(SIDEBAR_WIDTH_DEFAULT);
+      saveSidebarWidth(SIDEBAR_WIDTH_DEFAULT);
+    });
   }
 
   // 打开文件 / 打开文件夹 / 默认目录下拉
@@ -6795,6 +7164,16 @@
           });
         }
 
+      // 阅读宽度（设置抽屉）：只改正文栏最大宽度，导出产物不受影响
+      const readingWidthSelect = document.getElementById('reading-width');
+      if (readingWidthSelect) {
+        readingWidthSelect.addEventListener('change', function () {
+          state.settings.readingWidth = normalizeReadingWidth(this.value);
+          applySettings();
+          saveSettings();
+        });
+      }
+
       // 代码块注释是否斜体（默认正体：斜体对中文注释反而更难读）
       const commentItalicToggle = document.getElementById('comment-italic-toggle');
       if (commentItalicToggle) {
@@ -6952,6 +7331,8 @@
           if (path) {
             if (nowHidden) state.expandedFolders.add(path);
             else state.expandedFolders.delete(path);
+            // 持久化：刷新页面后目录仍保持展开（原来只在内存里，重启就全收起）
+            saveExpandedFolders();
           }
         }
         return;
@@ -8030,7 +8411,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.24)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.25)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
@@ -8047,14 +8428,24 @@
     loadThemeMode();
     restoreTheme();
     loadSidebarState();
+    // 侧栏宽度 + 目录展开态 + 阅读现场都要在 renderTree / 恢复目录**之前**读进来，
+    // 否则第一帧画出来的是默认宽度与全收起的树，然后才「跳」到正确状态
+    loadSidebarWidth();
+    loadExpandedFolders();
+    loadReadingState();
     loadToolbarState();
     setSidebarTab(state.sidebarTab);
     bindEvents();
+    // 滚动位置落盘 + 大纲跟随的监听（都只挂一次）
+    bindReadingStateTracking();
+    bindOutlineSpy();
     renderTree();
     restoreDefaultDirectory()
       // 恢复完工作区再处理 ?open= 入口（新标签页由内部链接打开时才有这个参数）。
       // 必须排在恢复之后：那时 state.files 才有内容，才找得到目标文档。
       .then(openRequestedFileFromUrl)
+      // 没有 ?open= 时，恢复上次读到的文档与滚动位置（A1 会话恢复）
+      .then(restoreLastSessionDocument)
       .catch(function (e) {
         console.warn('恢复默认目录失败', e);
       });

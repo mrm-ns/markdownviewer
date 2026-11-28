@@ -80,8 +80,29 @@
     style.textContent = themeCss(theme);
 
     document.documentElement.setAttribute('data-app-theme', theme.isDark ? 'dark' : 'light');
-    
-    
+    // 工具栏「一键深色」按钮的图标跟着实际模式走（从主题抽屉、预设、导入主题改模式时都同步）
+    updateDarkModeButton();
+  }
+
+  // ---------- 一键深色（v1.1.25） ----------
+  // 旧路径要「🎨 主题 → 勾选深色 → 保存」，而且文案写的是「深色文档背景」，
+  // 实际却把工具栏 / 侧栏 / 正文背景整体切成深色 —— 说明与行为不符、入口也太深。
+  function updateDarkModeButton() {
+    const btn = document.getElementById('btn-toggle-dark');
+    if (!btn) return;
+    const dark = !!(state.theme && state.theme.isDark);
+    btn.textContent = dark ? '☀️' : '🌙';
+    btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    btn.title = dark ? '切换到浅色界面' : '切换到深色界面';
+  }
+
+  // 只翻转 isDark（不动配色方案），等价于主题抽屉里的那个复选框，但一次点击完成。
+  function toggleDarkMode() {
+    state.theme.isDark = !state.theme.isDark;
+    applyTheme();
+    renderThemeEditor();   // 主题抽屉里的复选框 / 预览保持同步
+    saveThemeToStorage();
+    toast(state.theme.isDark ? '已切换到深色界面' : '已切换到浅色界面');
   }
 
   function saveThemeToStorage() {
@@ -225,6 +246,10 @@
           // 与 commentItalic 同理用 === true —— 老版本设置里没有这个字段，
           // 若写成 !== false，老用户升级后会被判成「开启」，与默认值相反。
           openLinksInNewTab: parsed.openLinksInNewTab === true,
+          // 阅读宽度（v1.1.25）：0 = 占满窗口。
+          // 老版本设置里没有这个字段 → normalizeReadingWidth(undefined) 返回默认 900，
+          // 与历史版式完全一致（不能因为升级就把正文拉宽）。
+          readingWidth: normalizeReadingWidth(parsed.readingWidth),
           // 工作区文档链接是否新窗口打开：同样默认关闭（=== true 才开）。
           openInternalLinksInNewTab: parsed.openInternalLinksInNewTab === true
         };
@@ -255,6 +280,18 @@
     }
   }
 
+  // 阅读宽度校验：0 表示「占满窗口」（CSS 侧写成 max-width: none），
+  // 其余夹在 600–1600 之间。注意 Number('') === 0 且 Number(undefined) === NaN ——
+  // 因此「没存过」和「清空输入框」都必须显式回落到默认值 900，不能靠 ||。
+  function normalizeReadingWidth(value) {
+    if (value === 0 || value === '0') return 0;
+    if (value === undefined || value === null || value === '') return 900;
+    const n = Number(value);
+    if (!isFinite(n)) return 900;
+    if (n === 0) return 0;
+    return Math.round(Math.min(1600, Math.max(600, n)));
+  }
+
   function applySettings() {
     const root = document.documentElement;
     root.style.setProperty('--md-text-size', state.settings.textSize + 'px');
@@ -267,6 +304,9 @@
     // 背景必须与图片**完全贴合**：留内边距会像「相框把图片包起来」，
     // 所以这里恒为 0（保留变量是为了样式表里有一处可覆盖的入口）。
     root.style.setProperty('--md-image-padding', '0px');
+    // 阅读宽度：0 = 占满窗口 → 写 none（不能写 0px，那会把正文压成一条线）
+    root.style.setProperty('--md-reading-width',
+      state.settings.readingWidth > 0 ? state.settings.readingWidth + 'px' : 'none');
     // 注释斜体是写在 themeCss 生成的那段 CSS 里的（不是 CSS 变量），
     // 所以改设置后必须重新生成主题样式，否则开关要等切主题才生效。
     applyTheme();
@@ -292,6 +332,9 @@
     // 两个链接开关相互独立：外部链接（http/https/mailto/tel）与工作区文档链接。
     const openInternalLinksToggle = document.getElementById('open-internal-links-new-tab-toggle');
     if (openInternalLinksToggle) openInternalLinksToggle.checked = !!state.settings.openInternalLinksInNewTab;
+    // 阅读宽度（设置抽屉）：0 也要能回填（String(0) === '0'，对应 <option value="0">占满窗口</option>）
+    const readingWidthSelect = document.getElementById('reading-width');
+    if (readingWidthSelect) readingWidthSelect.value = String(state.settings.readingWidth);
   }
 
 

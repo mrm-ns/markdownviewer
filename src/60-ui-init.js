@@ -72,7 +72,60 @@
     bindSidebarMenuEvents();
     bindContentMenuEvents();
     bindContentJumpEvents();
+    // 工具栏 / 侧栏的快捷交互（一键深色、侧栏拖宽）
+    bindQuickToggleEvents();
     bindGlobalEvents();
+  }
+
+  // 工具栏 / 侧栏快捷交互（v1.1.25）：一键深色 + 侧栏宽度拖拽。
+  // 两者都只碰 CSS 变量 / localStorage，不重建正文 DOM，代价可以忽略。
+  function bindQuickToggleEvents() {
+    const darkBtn = document.getElementById('btn-toggle-dark');
+    if (darkBtn) {
+      darkBtn.addEventListener('click', toggleDarkMode);
+    }
+    bindSidebarResize();
+  }
+
+  // 侧栏拖宽：mousedown 时才把 mousemove / mouseup 挂到 document，
+  // 这样鼠标拖到正文、甚至拖出窗口也不会丢事件；松手立刻摘掉，避免常驻监听。
+  function bindSidebarResize() {
+    const resizer = document.getElementById('sidebar-resizer');
+    if (!resizer) return;
+    let dragging = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    function onMove(e) {
+      if (!dragging) return;
+      applySidebarWidth(startWidth + (e.clientX - startX));
+    }
+
+    function onUp() {
+      if (!dragging) return;
+      dragging = false;
+      document.body.classList.remove('resizing-sidebar');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      saveSidebarWidth(state.sidebarWidth);
+    }
+
+    resizer.addEventListener('mousedown', function (e) {
+      if (e.button !== 0 || state.sidebarCollapsed) return;
+      dragging = true;
+      startX = e.clientX;
+      startWidth = state.sidebarWidth || SIDEBAR_WIDTH_DEFAULT;
+      document.body.classList.add('resizing-sidebar');
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      e.preventDefault();   // 否则拖拽会变成「选中一片文字」
+    });
+
+    // 双击回到默认宽度（拖窄了不必一点点拖回来）
+    resizer.addEventListener('dblclick', function () {
+      applySidebarWidth(SIDEBAR_WIDTH_DEFAULT);
+      saveSidebarWidth(SIDEBAR_WIDTH_DEFAULT);
+    });
   }
 
   // 打开文件 / 打开文件夹 / 默认目录下拉
@@ -564,6 +617,16 @@
           });
         }
 
+      // 阅读宽度（设置抽屉）：只改正文栏最大宽度，导出产物不受影响
+      const readingWidthSelect = document.getElementById('reading-width');
+      if (readingWidthSelect) {
+        readingWidthSelect.addEventListener('change', function () {
+          state.settings.readingWidth = normalizeReadingWidth(this.value);
+          applySettings();
+          saveSettings();
+        });
+      }
+
       // 代码块注释是否斜体（默认正体：斜体对中文注释反而更难读）
       const commentItalicToggle = document.getElementById('comment-italic-toggle');
       if (commentItalicToggle) {
@@ -721,6 +784,8 @@
           if (path) {
             if (nowHidden) state.expandedFolders.add(path);
             else state.expandedFolders.delete(path);
+            // 持久化：刷新页面后目录仍保持展开（原来只在内存里，重启就全收起）
+            saveExpandedFolders();
           }
         }
         return;
@@ -1799,7 +1864,7 @@
   }
 
   function init() {
-    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.24)');
+    console.log('[Markdown Viewer] 离线渲染器已启用 (v1.1.25)');
     registerCustomLanguages();
     initMarkdown();
     loadSettings();
@@ -1816,14 +1881,24 @@
     loadThemeMode();
     restoreTheme();
     loadSidebarState();
+    // 侧栏宽度 + 目录展开态 + 阅读现场都要在 renderTree / 恢复目录**之前**读进来，
+    // 否则第一帧画出来的是默认宽度与全收起的树，然后才「跳」到正确状态
+    loadSidebarWidth();
+    loadExpandedFolders();
+    loadReadingState();
     loadToolbarState();
     setSidebarTab(state.sidebarTab);
     bindEvents();
+    // 滚动位置落盘 + 大纲跟随的监听（都只挂一次）
+    bindReadingStateTracking();
+    bindOutlineSpy();
     renderTree();
     restoreDefaultDirectory()
       // 恢复完工作区再处理 ?open= 入口（新标签页由内部链接打开时才有这个参数）。
       // 必须排在恢复之后：那时 state.files 才有内容，才找得到目标文档。
       .then(openRequestedFileFromUrl)
+      // 没有 ?open= 时，恢复上次读到的文档与滚动位置（A1 会话恢复）
+      .then(restoreLastSessionDocument)
       .catch(function (e) {
         console.warn('恢复默认目录失败', e);
       });

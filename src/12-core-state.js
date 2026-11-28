@@ -36,6 +36,9 @@
       // 只作用于阅读器里的点击（见 bindContentJumpEvents 的链接处理）；
       // 导出的 HTML 不含这个开关的影响。
       openLinksInNewTab: false,
+      // 阅读宽度（v1.1.25）：正文栏最大宽度（px），0 = 占满窗口。
+      // 只影响阅读界面 —— 导出的 HTML / PDF 仍用各自的版式（§5.1），不读这个值。
+      readingWidth: 900,
       // 工作区**内部文档链接**（含 #标题 锚点）是否在新窗口打开。
       // 与上面的外部链接开关相互独立：两个都开 = 所有链接都新窗口。
       // 实现上不是 window.open(href) —— 应用没有文件级 URL，只能打开
@@ -58,8 +61,16 @@
     userThemes: [],     // 用户导入的主题，会出现在预设下拉框中
     sidebarTab: 'files',
     sidebarCollapsed: false,
+    // 侧栏宽度（v1.1.25）：拖拽条改这里，并落 localStorage。
+    // CSS 通过 --sidebar-width 消费它，所以只在 applySidebarWidth() 里写一处。
+    sidebarWidth: 300,
     toolbarCollapsed: false,
+    // 目录展开态：现在会持久化到 localStorage（刷新后仍保持展开）
     expandedFolders: new Set(), // 文件树中已展开的目录路径（默认收起）
+    // 阅读现场（v1.1.25）：lastPath = 上次读到的文档；scrollByPath = 每篇文档的滚动位置。
+    // 两者都存在 localStorage（见 24-core-files.js 的 loadReadingState / saveReadingState），
+    // 启动时先恢复目录、再恢复文档与滚动位置。
+    readingState: { lastPath: null, scrollByPath: {} },
     pdfColors: Object.assign({}, PDF_BASE_COLORS), // 导出 PDF 配色
     pdfLayout: Object.assign({}, PDF_LAYOUT_DEFAULTS), // 导出 PDF 版式（字号/行高/纸张/字体），与阅读器 state.settings 无关
     pdfPreviewBody: null, // PDF 预览缓存的正文 HTML（图片已内联）；正文重渲染时置空
